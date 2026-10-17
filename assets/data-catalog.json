@@ -1,6 +1,6 @@
 {
   "version": "vnext-20261017",
-  "generatedAt": "2026-10-17T23:25:49.554Z",
+  "generatedAt": "2026-10-17T23:31:45.515Z",
   "strategy": "native-esm-lazy-map",
   "layers": {
     "network": {
@@ -30,7 +30,7 @@
     },
     "app": {
       "url": "assets/map-app.js",
-      "bytes": 121628
+      "bytes": 123349
     },
     "worker": {
       "url": "assets/line-index-worker.js",

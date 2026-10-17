@@ -167,10 +167,44 @@ function makeTransferBadgeMarker(record,labels,visible,custom){
   return{marker,width};
 }
 let transferRenderToken=0,transferBadgePoints=[];
-function renderTransfers(){
+function clearTransferOverlay(){
+ transferRenderToken++;
  transferLayer.clearLayers();
- const toggle=document.getElementById('transferToggle'),token=++transferRenderToken;
- if(transferBadgePoints.length){const old=new Set(transferBadgePoints);currentBadgePoints=currentBadgePoints.filter(point=>!old.has(point))}transferBadgePoints=[];
+ if(transferBadgePoints.length){const old=new Set(transferBadgePoints);currentBadgePoints=currentBadgePoints.filter(point=>!old.has(point))}
+ transferBadgePoints=[];
+}
+function renderTransferPointsOnly(){
+ clearTransferOverlay();
+ const toggle=document.getElementById('transferToggle');
+ if(!toggle?.checked||map.getZoom()<11)return;
+ const bounds=map.getBounds(),visibleNetwork=new Set(lineNames.filter(name=>routeLayers[name]&&map.hasLayer(routeLayers[name]))),customByStation=new Map();
+ // Les liaisons déjà calées sur une gare sont disponibles immédiatement. Les arrêts
+ // personnalisés non raccordés restent traités par le rendu détaillé au zoom.
+ for(const line of userLines){
+  if(customLineVisibility[line.id]===false)continue;
+  for(const stop of line.stops||[]){
+   const key=stop.stationKey;
+   if(!key)continue;
+   let names=customByStation.get(key);
+   if(!names)customByStation.set(key,names=new Set());
+   names.add(line.title);
+  }
+ }
+ for(const record of stationLabelRecords.values()){
+  if(!bounds.contains([record.lat,record.lng]))continue;
+  const visible=[...record.lines].filter(name=>visibleNetwork.has(name));
+  const custom=[...(customByStation.get(record.key)||[])];
+  const labels=[...new Set(visible.map(name=>badgeText(name)).concat(custom))];
+  if(labels.length<2)continue;
+  const marker=L.circleMarker([record.lat,record.lng],{pane:'transfers',radius:5.8,weight:2,color:'#fff',fillColor:'#263b67',fillOpacity:.98,interactive:true});
+  marker.bindTooltip('Correspondance · '+labels.join(' · '),{direction:'top',offset:[0,-6],opacity:.96});
+  marker.bindPopup('<strong>'+escapeHtml([...record.names.keys()][0]||'Correspondance')+'</strong><br>Correspondance · '+labels.map(escapeHtml).join(' · '));
+  transferLayer.addLayer(marker);
+ }
+}
+function renderTransfers(){
+ clearTransferOverlay();
+ const toggle=document.getElementById('transferToggle'),token=transferRenderToken;
  if(!toggle?.checked||map.getZoom()<11)return;
  const zoom=map.getZoom(),bounds=map.getBounds(),compactMode=stationDisplayMode()==='logos',allowCustom=zoom>=CUSTOM_DETAIL_ZOOM,badgePlaced=[],customByStation=new Map();
  if(allowCustom)for(const line of userLines){if(!Array.isArray(line.stops)||line.stops.length<2||customLineVisibility[line.id]===false)continue;for(const stop of line.stops){const record=customNetworkRecord(stop);if(!record)continue;let lines=customByStation.get(record.key);if(!lines)customByStation.set(record.key,lines=new Set());lines.add(line.title)}}
@@ -218,7 +252,7 @@ function updateStationNameLabels(){
     L.marker(labelLatLng,{interactive:false,icon:L.divIcon({className:'station-name-label',html,iconSize:[station.width,20],iconAnchor:[station.width/2,16]})}).addTo(stationNameLayer);
   }
 }
-document.getElementById('lineBadgesToggle').addEventListener('change',()=>{updateLineBadges();updateTownLabels();renderCustom()});document.getElementById('stationNamesToggle').addEventListener('change',()=>{updateStationNameLabels();renderCustom()});function redrawVisibleRoutes(){for(const name of lineNames){if(map.hasLayer(routeLayers[name]))redrawRouteStrokes[name]?.()}}document.getElementById('stationNamesMode').addEventListener('change',()=>{redrawVisibleRoutes();updateLineBadges();renderCustom();updateStationNameLabels()});function refreshTransferStationPoints(){const showTransferPoint=document.getElementById('transferToggle')?.checked!==false;for(const name of lineNames){const layer=stationLayersByLine[name];if(!layer)continue;layer.eachLayer(shape=>{const raw=shape._transferRawCoord;if(!raw)return;const clusterKey=shape._transferClusterKey,isTransfer=stationTransferKeys.has(clusterKey),visibleTransferLines=visibleStationLineCount(clusterKey),useHub=isTransfer&&showTransferPoint&&visibleTransferLines>1,clusterCoord=stationClusterCoordsByKey.get(clusterKey),coord=useHub&&clusterCoord?clusterCoord:(shape._transferPlanned?(clusterCoord||raw):offsetRailStation(name,raw,map.getZoom()));shape.setLatLng([coord[1],coord[0]]);shape.setRadius(useHub?.1:stationPointRadius)})}}document.getElementById('transferToggle').addEventListener('change',()=>{refreshTransferStationPoints();renderCustom()});let overlayRefreshFrame=0;function scheduleOverlayRefresh(){if(overlayRefreshFrame)return;overlayRefreshFrame=requestAnimationFrame(()=>{overlayRefreshFrame=0;updateLineBadges();renderCustom();updateStationNameLabels();updateTownLabels();renderTransfers()})}map.on('zoomend',()=>{redrawVisibleRoutes();scheduleOverlayRefresh()});map.on('moveend',scheduleOverlayRefresh);setTimeout(()=>{updateLineBadges();updateStationNameLabels();updateTownLabels();renderTransfers()},80);
+document.getElementById('lineBadgesToggle').addEventListener('change',()=>{updateLineBadges();updateTownLabels();renderCustom()});document.getElementById('stationNamesToggle').addEventListener('change',()=>{updateStationNameLabels();renderCustom()});function redrawVisibleRoutes(){for(const name of lineNames){if(map.hasLayer(routeLayers[name]))redrawRouteStrokes[name]?.()}}document.getElementById('stationNamesMode').addEventListener('change',()=>{redrawVisibleRoutes();updateLineBadges();renderCustom();updateStationNameLabels()});function refreshTransferStationPoints(){const showTransferPoint=document.getElementById('transferToggle')?.checked!==false;for(const name of lineNames){const layer=stationLayersByLine[name];if(!layer)continue;layer.eachLayer(shape=>{const raw=shape._transferRawCoord;if(!raw)return;const clusterKey=shape._transferClusterKey,isTransfer=stationTransferKeys.has(clusterKey),visibleTransferLines=visibleStationLineCount(clusterKey),useHub=isTransfer&&showTransferPoint&&visibleTransferLines>1,clusterCoord=stationClusterCoordsByKey.get(clusterKey),coord=useHub&&clusterCoord?clusterCoord:(shape._transferPlanned?(clusterCoord||raw):offsetRailStation(name,raw,map.getZoom()));shape.setLatLng([coord[1],coord[0]]);shape.setRadius(useHub?.1:stationPointRadius)})}}document.getElementById('transferToggle').addEventListener('change',()=>{refreshTransferStationPoints();renderTransferPointsOnly()});let overlayRefreshFrame=0;function scheduleOverlayRefresh(){if(overlayRefreshFrame)return;overlayRefreshFrame=requestAnimationFrame(()=>{overlayRefreshFrame=0;updateLineBadges();renderCustom();updateStationNameLabels();updateTownLabels();renderTransfers()})}map.on('zoomend',()=>{redrawVisibleRoutes();scheduleOverlayRefresh()});map.on('moveend',scheduleOverlayRefresh);setTimeout(()=>{updateLineBadges();updateStationNameLabels();updateTownLabels();renderTransfers()},80);
 
 const datalist=document.getElementById('stationNames');for(const f of uniqueStations){const option=document.createElement('option');option.value=f.properties.name;datalist.appendChild(option)}for(const place of DATA.pois||[]){const option=document.createElement('option');datalist.appendChild(option);option.value=place.name}for(const place of DATA.educationPlaces||[]){const option=document.createElement('option');datalist.appendChild(option);option.value=place.name}
 const networkStationDatalist=document.getElementById('networkStationNames');for(const station of connectableStations){const option=document.createElement('option');option.value=station.label;networkStationDatalist.appendChild(option)}
@@ -325,7 +359,7 @@ function renderCustom(){
     })
    }catch(error){console.error('Ligne personnalisée ignorée',line.id,error)}
   }
-  renderSavedLines();updateCustomLogoVisibility();updateStationNameLabels();renderTransfers()
+  renderSavedLines();updateCustomLogoVisibility();renderTransferPointsOnly();updateStationNameLabels()
 }function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function setDrawing(value){drawing=value;const line=activeLine();drawButton.textContent=drawing?'Terminer le tracé':(line?.stops.length?'Reprendre le tracé':'Commencer le tracé');drawButton.classList.toggle('primary',drawing);document.getElementById('drawingNote').classList.toggle('visible',drawing);document.getElementById('map').style.cursor=drawing?'crosshair':'';setStatus(drawing?'Clique sur la carte ; à moins de 24 px d’une gare, l’arrêt s’y calera.':'Mode dessin arrêté.');}
 map.on('click',e=>{if(!drawing)return;const line=activeLine();if(!line)return;const typedName=stopNameInput.value.trim();let match=null;if(document.getElementById('snapToStations').checked){const clickPoint=map.latLngToContainerPoint(e.latlng);let nearestDistance=24;for(const station of connectableStations){const point=map.latLngToContainerPoint([station.lat,station.lng]),distance=clickPoint.distanceTo(point);if(distance<=nearestDistance){nearestDistance=distance;match=station}}}const stopName=typedName||(match?match.name:'Arrêt '+(line.stops.length+1)),lat=match?match.lat:e.latlng.lat,lng=match?match.lng:e.latlng.lng;line.stops.push({name:stopName,lat,lng,...(match?{stationKey:match.key,stationNames:match.names,stationLines:match.lines}:{})});stopNameInput.value='';persist();renderCustom();setStatus(match?'Arrêt raccordé à « '+match.name+' » · '+match.lines.join(', '):('Arrêt « '+stopName+' » ajouté sur la carte.'))});
