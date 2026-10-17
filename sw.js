@@ -7,6 +7,7 @@ const STATIC_ASSETS = [
   './assets/leaflet.css',
   './assets/map-boot.js',
   './assets/map-app.js',
+  './assets/line-index-worker.js',
   './assets/data-catalog.json',
   './assets/transitlab-favicon-32.png',
   './assets/transitlab-favicon-48.png',
