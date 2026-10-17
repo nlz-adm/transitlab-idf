@@ -1,0 +1,40 @@
+{
+  "version": "vnext-20261017",
+  "generatedAt": "2026-10-17T22:01:34.594Z",
+  "strategy": "native-esm-lazy-map",
+  "layers": {
+    "network": {
+      "url": "assets/network-data.json",
+      "bytes": 602797,
+      "loading": "after-shell"
+    },
+    "optional": {
+      "url": "assets/network-optional.json",
+      "bytes": 425210,
+      "loading": "on-demand"
+    },
+    "communes": {
+      "url": "assets/communes-fast.json",
+      "bytes": 1184162,
+      "loading": "on-demand"
+    },
+    "basemap": {
+      "url": "assets/ign-idf-fast.webp",
+      "loading": "on-demand"
+    }
+  },
+  "scripts": {
+    "boot": {
+      "url": "assets/map-boot.js",
+      "bytes": 629
+    },
+    "app": {
+      "url": "assets/map-app.js",
+      "bytes": 116950
+    },
+    "leaflet": {
+      "url": "assets/leaflet.js",
+      "bytes": 147552
+    }
+  }
+}
