@@ -1,6 +1,6 @@
 {
   "version": "vnext-20261017",
-  "generatedAt": "2026-10-17T23:31:45.515Z",
+  "generatedAt": "2026-10-17T23:32:45.425Z",
   "strategy": "native-esm-lazy-map",
   "layers": {
     "network": {
