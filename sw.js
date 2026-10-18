@@ -1,4 +1,4 @@
-const CACHE_NAME = 'transitlab-plan-rer-style-20261018b';
+const CACHE_NAME = 'transitlab-plan-rer-style-20261018c';
 const STATIC_ASSETS = [
   './',
   './index.html',
