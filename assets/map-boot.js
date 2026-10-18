@@ -1,6 +1,6 @@
 // Petit point d'entrée différé : la page peut peindre son interface avant de
 // parser le moteur cartographique et ses données volumineuses.
-const start = () => import('./map-app.js?v=plan-m5-interchanges-20261018l').catch((error) => {
+const start = () => import('./map-app.js?v=plan-m5-interchanges-20261018m').catch((error) => {
   const map = document.getElementById('map');
   if (!map) return;
   map.textContent = 'Impossible de charger le moteur de la carte. ' + (error?.message || '');

@@ -1,6 +1,6 @@
 {
-  "version": "plan-m5-interchanges-20261018l",
-  "generatedAt": "2026-10-18T13:34:14.775Z",
+  "version": "plan-m5-interchanges-20261018m",
+  "generatedAt": "2026-10-18T13:43:03.955Z",
   "strategy": "native-esm-lazy-map",
   "layers": {
     "network": {
@@ -30,7 +30,7 @@
     },
     "app": {
       "url": "assets/map-app.js",
-      "bytes": 134756
+      "bytes": 134883
     },
     "worker": {
       "url": "assets/line-index-worker.js",
