@@ -1,4 +1,4 @@
-const CACHE_NAME = 'transitlab-plan-m5-interchanges-20261018j';
+const CACHE_NAME = 'transitlab-plan-m5-interchanges-20261018k';
 const STATIC_ASSETS = [
   './',
   './index.html',
