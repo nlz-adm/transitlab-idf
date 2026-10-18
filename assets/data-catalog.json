@@ -1,6 +1,6 @@
 {
-  "version": "plan-rer-style-20261018b",
-  "generatedAt": "2026-10-18T11:18:46.091Z",
+  "version": "plan-rer-style-20261018c",
+  "generatedAt": "2026-10-18T11:22:33.936Z",
   "strategy": "native-esm-lazy-map",
   "layers": {
     "network": {
