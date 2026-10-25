@@ -1,0 +1,112 @@
+{
+  "version": "idf-iris-rp2022-2024-20261026",
+  "generatedAt": "2026-10-26",
+  "features": 5264,
+  "matchedPopulation": 5264,
+  "departments": [
+    {
+      "department": "75",
+      "url": "assets/population-iris/75.geojson.gz",
+      "bbox": [
+        2.224219,
+        48.815562,
+        2.469834,
+        48.902148
+      ],
+      "features": 992,
+      "bytesCompressed": 141907
+    },
+    {
+      "department": "77",
+      "url": "assets/population-iris/77.geojson.gz",
+      "bbox": [
+        2.39234,
+        48.120077,
+        3.559027,
+        49.117905
+      ],
+      "features": 761,
+      "bytesCompressed": 1225186
+    },
+    {
+      "department": "78",
+      "url": "assets/population-iris/78.geojson.gz",
+      "bbox": [
+        1.4463,
+        48.438559,
+        2.229144,
+        49.085407
+      ],
+      "features": 683,
+      "bytesCompressed": 648633
+    },
+    {
+      "department": "91",
+      "url": "assets/population-iris/91.geojson.gz",
+      "bbox": [
+        1.914528,
+        48.284559,
+        2.58565,
+        48.776135
+      ],
+      "features": 507,
+      "bytesCompressed": 517203
+    },
+    {
+      "department": "92",
+      "url": "assets/population-iris/92.geojson.gz",
+      "bbox": [
+        2.145719,
+        48.729354,
+        2.33696,
+        48.951088
+      ],
+      "features": 616,
+      "bytesCompressed": 178556
+    },
+    {
+      "department": "93",
+      "url": "assets/population-iris/93.geojson.gz",
+      "bbox": [
+        2.28833,
+        48.80725,
+        2.603314,
+        49.012332
+      ],
+      "features": 614,
+      "bytesCompressed": 204694
+    },
+    {
+      "department": "94",
+      "url": "assets/population-iris/94.geojson.gz",
+      "bbox": [
+        2.308694,
+        48.687631,
+        2.615682,
+        48.861487
+      ],
+      "features": 530,
+      "bytesCompressed": 187201
+    },
+    {
+      "department": "95",
+      "url": "assets/population-iris/95.geojson.gz",
+      "bbox": [
+        1.608748,
+        48.908625,
+        2.595002,
+        49.241463
+      ],
+      "features": 561,
+      "bytesCompressed": 442081
+    }
+  ],
+  "bytesCompressed": 3545461,
+  "sources": {
+    "geometry": "IGN & INSEE · Contours...IRIS édition 2024, portail Open Data Île-de-France",
+    "population": "INSEE · Recensement de la population 2022 · base infracommunale · géographie au 1er janvier 2024",
+    "area": "Surface géodésique calculée depuis les polygones IRIS"
+  },
+  "limitation": "Les IRIS sont des quartiers statistiques, pas toujours des quartiers vécus. Les IRIS de type Z correspondent à des communes non découpées; leurs polygones sont donc des limites communales. Les zones d’activité et zones diverses peuvent être peu peuplées.",
+  "license": "Licence Ouverte / Open Licence 2.0"
+}

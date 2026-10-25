@@ -1,6 +1,6 @@
 {
-  "version": "plan-m20-labels-no-cartouches-20261018s",
-  "generatedAt": "2026-10-18T14:35:39.981Z",
+  "version": "idf-iris-density-20261026",
+  "generatedAt": "2026-10-26",
   "strategy": "native-esm-lazy-map",
   "layers": {
     "network": {
@@ -21,16 +21,24 @@
     "basemap": {
       "url": "assets/ign-idf-fast.webp",
       "loading": "on-demand"
+    },
+    "populationIris": {
+      "url": "assets/population-iris-index.json",
+      "features": 5264,
+      "matchedPopulation": 5264,
+      "departments": 8,
+      "bytesCompressed": 3545461,
+      "loading": "Index at startup; department chunks fetched only when the layer is enabled at zoom 12+"
     }
   },
   "scripts": {
     "boot": {
       "url": "assets/map-boot.js",
-      "bytes": 668
+      "bytes": 672
     },
     "app": {
       "url": "assets/map-app.js",
-      "bytes": 133164
+      "bytes": 139820
     },
     "worker": {
       "url": "assets/line-index-worker.js",
