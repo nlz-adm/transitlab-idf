@@ -1,5 +1,5 @@
 {
-  "version": "idf-iris-density-fix-20261026",
+  "version": "idf-iris-hydrography-labels-20261026",
   "generatedAt": "2026-10-26",
   "strategy": "native-esm-lazy-map",
   "layers": {
@@ -29,6 +29,13 @@
       "departments": 8,
       "bytesCompressed": 3545461,
       "loading": "Index at startup; department chunks fetched only when the layer is enabled at zoom 12+"
+    },
+    "hydrography": {
+      "url": "assets/hydrography.geojson.gz",
+      "features": 7162,
+      "bytesCompressed": 792529,
+      "loading": "Loaded only when the checked map layer is enabled; reuses cached extract",
+      "source": "OpenStreetMap contributors · Open Database License (ODbL)"
     }
   },
   "scripts": {
@@ -38,7 +45,7 @@
     },
     "app": {
       "url": "assets/map-app.js",
-      "bytes": 139306
+      "bytes": 143059
     },
     "worker": {
       "url": "assets/line-index-worker.js",
