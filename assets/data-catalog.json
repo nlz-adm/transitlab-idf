@@ -1,5 +1,5 @@
 {
-  "version": "idf-iris-density-20261026",
+  "version": "idf-iris-density-fix-20261026",
   "generatedAt": "2026-10-26",
   "strategy": "native-esm-lazy-map",
   "layers": {
@@ -38,7 +38,7 @@
     },
     "app": {
       "url": "assets/map-app.js",
-      "bytes": 139820
+      "bytes": 139306
     },
     "worker": {
       "url": "assets/line-index-worker.js",

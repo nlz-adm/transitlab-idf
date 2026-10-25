@@ -1,4 +1,4 @@
-const CACHE_NAME = 'transitlab-idf-iris-density-20261026';
+const CACHE_NAME = 'transitlab-idf-iris-density-fix-20261026';
 const STATIC_ASSETS = [
   './',
   './index.html',
