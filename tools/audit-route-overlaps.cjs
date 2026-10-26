@@ -72,16 +72,16 @@ for (const bucket of cells.values()) {
       const t2 = ((dx - ax) * ux + (dy - ay) * uy) / (length * length);
       const overlap = Math.max(0, Math.min(1, Math.max(t1, t2)) - Math.max(0, Math.min(t1, t2))) * length;
       if (overlap < minOverlapMeters) continue;
-      candidates.push({ lines: [s.line, t.line].sort(), overlapMeters: Math.round(overlap), offsetMeters: Math.round(Math.max(offsetA, offsetB)) });
+      candidates.push({ lines: [s.line, t.line].sort(), overlapMeters: Math.round(overlap), offsetMeters: Math.round(Math.max(offsetA, offsetB)), a: s.a, b: s.b, otherA: t.a, otherB: t.b });
     }
   }
 }
 const byPair = new Map();
 for (const candidate of candidates) {
   const key = candidate.lines.join(' ↔ ');
-  const record = byPair.get(key) || { pair: key, candidateSegments: 0, maxOverlapMeters: 0 };
+  const record = byPair.get(key) || { pair: key, candidateSegments: 0, maxOverlapMeters: 0, examples: [] };
   record.candidateSegments++;
-  record.maxOverlapMeters = Math.max(record.maxOverlapMeters, candidate.overlapMeters);
+  record.maxOverlapMeters = Math.max(record.maxOverlapMeters, candidate.overlapMeters);\n  if (record.examples.length < 3) record.examples.push({ overlapMeters: candidate.overlapMeters, offsetMeters: candidate.offsetMeters, a: candidate.a, b: candidate.b, otherA: candidate.otherA, otherB: candidate.otherB });
   byPair.set(key, record);
 }
 const report = {
