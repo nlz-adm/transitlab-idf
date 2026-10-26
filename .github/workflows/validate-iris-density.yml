@@ -1,0 +1,36 @@
+name: Validate IRIS density data
+
+on:
+  pull_request:
+    paths:
+      - "assets/population-iris-index.json"
+      - "assets/population-iris/**"
+      - "assets/map-app.js"
+      - "assets/map-boot.js"
+      - "assets/data-catalog.json"
+      - "carte-interactive-ile-de-france.html"
+      - "sw.js"
+      - "tools/validate-iris-density.py"
+      - ".github/workflows/validate-iris-density.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-iris:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Validate compressed IRIS data
+        run: python tools/validate-iris-density.py
+      - name: Check JavaScript syntax
+        run: node --check assets/map-app.js
+      - name: Check JSON data catalog and IRIS index
+        run: |
+          python -c "import json; json.load(open('assets/data-catalog.json', encoding='utf-8')); json.load(open('assets/population-iris-index.json', encoding='utf-8'))"
