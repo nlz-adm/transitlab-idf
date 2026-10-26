@@ -26,8 +26,8 @@ def mode_for(line, raw=""):
         return "RER"
     if "TRAM" in value or line.startswith("T") and line[1:].isdigit():
         return "Tramway"
-    if "CABLE" in value or line.startswith("C"):
-        return "Tramway"
+    if "CABLE" in value or line.startswith("C1"):
+        return "Navette"
     return "Transilien"
 
 def normalize_line(value):
@@ -45,6 +45,8 @@ def normalize_line(value):
         value = "METRO " + value[1:]
     elif value.startswith("T") and value[1:].isdigit():
         value = "TRAM " + value[1:]
+    elif value.startswith("LIGNE "):
+        value = "TRAIN " + value[len("LIGNE "):]
     return replacements.get(value, value)
 
 def main():
@@ -59,15 +61,15 @@ def main():
         coords = geometry.get("coordinates")
         if not coords:
             continue
-        raw_line = pick(props, "nomlong", "nom_long", "route_long_name", "route_short_name", "line", "libelle", "nom",
+        raw_line = pick(props, "res_com", "nomlong", "nom_long", "route_long_name", "route_short_name", "line", "libelle", "nom",
                         "idrefligc", "IDREFLIGC", "id_ref_lig_c", "id_ilico")
         if not raw_line:
             continue
         line = normalize_line(raw_line)
-        color = pick(props, "couleur", "color", "route_color", "code_couleur").lstrip("#")
+        color = pick(props, "colourweb_hexa", "couleur", "color", "route_color", "code_couleur").lstrip("#")
         if not color or len(color) != 6:
             color = "65758b"
-        raw_mode = pick(props, "mode", "mode_transport", "type", "transport_mode")
+        raw_mode = pick(props, "mode", "reseau", "mode_transport", "type", "transport_mode")
         normalized.append({
             "type": "Feature",
             "properties": {
