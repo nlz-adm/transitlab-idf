@@ -13,6 +13,26 @@ assert.ok(builder, 'map-app.js must expose the real route-topology index builder
 assert.ok(predicate, 'map-app.js must expose the real junction-pinning helper');
 assert.ok(stationPinner, 'map-app.js must expose the real station anchoring helper');
 
+const normalizerMatch = fs.readFileSync('assets/map-app.js', 'utf8').match(/function normalizeSharedTrackSegmentation\\(lines\\)\\{[\\s\\S]*?\\n\\}/);
+assert.ok(normalizerMatch, 'map-app.js must normalize shared route segmentation before indexing');
+const normalizeContext = {};
+vm.createContext(normalizeContext);
+vm.runInContext(normalizerMatch[0], normalizeContext);
+const differentlySegmented = [
+ { properties:{line:'A'}, geometry:{type:'LineString',coordinates:[[2,48],[2.01,48]]} },
+ { properties:{line:'B'}, geometry:{type:'LineString',coordinates:[[2.002,48],[2.006,48],[2.008,48]]} }
+];
+normalizeContext.normalizeSharedTrackSegmentation(differentlySegmented);
+assert.deepEqual(
+ differentlySegmented[0].geometry.coordinates.map(c=>Number(c[0].toFixed(5))),
+ [2,2.002,2.006,2.008,2.01],
+ 'the longer route must be split at endpoints from the shorter route'
+);
+assert.deepEqual(
+ differentlySegmented[1].geometry.coordinates.map(c=>Number(c[0].toFixed(5))),
+ [2.002,2.006,2.008],
+ 'existing vertices must be preserved'
+);
 const coordKey = c => Number(c[0]).toFixed(5) + ',' + Number(c[1]).toFixed(5);
 const stationKey = (lng, lat) => [Number(lng).toFixed(5), Number(lat).toFixed(5)].join(',');
 const edgeKey = (a, b) => {
