@@ -33,6 +33,16 @@ assert.deepEqual(
  [2.002,2.006,2.008],
  'existing vertices must be preserved'
 );
+const nearParallel = [
+ { properties:{line:'C'}, geometry:{type:'LineString',coordinates:[[2,48],[2.01,48]]} },
+ { properties:{line:'D'}, geometry:{type:'LineString',coordinates:[[2.002,48.000008],[2.006,48.000008],[2.008,48.000008]]} }
+];
+normalizeContext.normalizeSharedTrackSegmentation(nearParallel);
+assert.deepEqual(
+ Array.from(nearParallel[0].geometry.coordinates, c=>Number(c[0].toFixed(5))),
+ [2,2.01],
+ 'nearby parallel routes must not be snapped into one shared segmentation'
+);
 const coordKey = c => Number(c[0]).toFixed(5) + ',' + Number(c[1]).toFixed(5);
 const stationKey = (lng, lat) => [Number(lng).toFixed(5), Number(lat).toFixed(5)].join(',');
 const edgeKey = (a, b) => {
