@@ -15,6 +15,8 @@ on:
       - "tools/validate-iris-density.py"
       - "tools/test-iris-map-logic.cjs"
       - "tools/test-route-topology.cjs"
+      - "tools/audit-route-overlaps.cjs"
+      - "assets/network-data.json"
       - "tools/test-iris-browser.mjs"
       - ".github/workflows/validate-iris-density.yml"
   pull_request:
@@ -29,6 +31,9 @@ on:
       - "tools/validate-iris-density.py"
       - "tools/test-iris-map-logic.cjs"
       - "tools/test-iris-browser.mjs"
+      - "tools/test-route-topology.cjs"
+      - "tools/audit-route-overlaps.cjs"
+      - "assets/network-data.json"
       - ".github/workflows/validate-iris-density.yml"
   workflow_dispatch:
 
@@ -53,6 +58,8 @@ jobs:
         run: node tools/test-iris-map-logic.cjs
       - name: Test route junction topology
         run: node tools/test-route-topology.cjs
+      - name: Audit potentially overlapping route geometries
+        run: node tools/audit-route-overlaps.cjs
       - name: Check JSON data catalog and IRIS index
         run: |
           python -c "import json; json.load(open('assets/data-catalog.json', encoding='utf-8')); json.load(open('assets/population-iris-index.json', encoding='utf-8'))"
