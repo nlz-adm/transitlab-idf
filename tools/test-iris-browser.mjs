@@ -1,6 +1,11 @@
 import { chromium } from 'playwright';
 
 const errors = [];
+const targetUrl = new URL(process.env.TRANSITLAB_TEST_URL || 'http://127.0.0.1:4173/carte-interactive-ile-de-france.html');
+targetUrl.searchParams.set('test', '1');
+const screenshotPath = process.env.IRIS_SCREENSHOT_PATH || '/tmp/iris-map-smoke.png';
+const maxLabelMs = process.env.IRIS_LABEL_MAX_MS === undefined ? 5000 : Number(process.env.IRIS_LABEL_MAX_MS);
+const benchmarkLabel = process.env.IRIS_BENCHMARK_LABEL || 'head';
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
@@ -11,7 +16,7 @@ try {
     }
   });
 
-  const response = await page.goto('http://127.0.0.1:4173/carte-interactive-ile-de-france.html?test=1', {
+  const response = await page.goto(targetUrl.toString(), {
     waitUntil: 'domcontentloaded',
     timeout: 30000,
   });
@@ -34,7 +39,7 @@ try {
   const irisFeatures = await page.evaluate(() => document.querySelectorAll('.leaflet-population-density-pane canvas, .leaflet-population-density-pane path').length);
   if (irisFeatures < 1) throw new Error('Le moteur de rendu de la couche IRIS n’est pas présent dans son panneau Leaflet.');
 
-  // Move to neighborhood scale explicitly and measure the asynchronous IRIS refresh.
+  // Measure the first label after moving to the same neighborhood-scale viewport.
   const labelRefreshStarted = Date.now();
   await page.evaluate(() => { window.__transitLabMap.setView([48.8566, 2.3522], 15); });
   try {
@@ -54,9 +59,9 @@ try {
 
   const labelRefreshMs = Date.now() - labelRefreshStarted;
   const labelCount = await page.locator('.iris-name-label').count();
-  await page.screenshot({ path: '/tmp/iris-map-smoke.png', fullPage: false });
-  if (labelRefreshMs > 5000) {
-    throw new Error(`Le premier libellé de quartier met trop longtemps à apparaître : ${labelRefreshMs} ms (seuil CI : 5000 ms).`);
+  await page.screenshot({ path: screenshotPath, fullPage: false });
+  if (maxLabelMs > 0 && labelRefreshMs > maxLabelMs) {
+    throw new Error(`Le premier libellé de quartier met trop longtemps à apparaître : ${labelRefreshMs} ms (seuil CI : ${maxLabelMs} ms).`);
   }
   await densityToggle.uncheck();
   await page.locator('#communesBoundaryToggle').check();
@@ -65,6 +70,7 @@ try {
   if (errors.length) throw new Error('Erreurs JavaScript navigateur : ' + errors.join(' | '));
   console.log(JSON.stringify({
     result: 'PASS',
+    benchmark: benchmarkLabel,
     map: 'Leaflet initialisée',
     densityLegend: 'visible après activation',
     densityPaneRendererElements: irisFeatures,
