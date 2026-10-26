@@ -1,5 +1,5 @@
 {
-  "version": "idf-custom-transport-20261026",
+  "version": "idf-custom-transport-20261026-iris-label-v1",
   "generatedAt": "2026-10-26",
   "strategy": "native-esm-lazy-map",
   "layers": {
@@ -45,7 +45,7 @@
     },
     "app": {
       "url": "assets/map-app.js",
-      "bytes": 146805
+      "bytes": 146542
     },
     "worker": {
       "url": "assets/line-index-worker.js",
