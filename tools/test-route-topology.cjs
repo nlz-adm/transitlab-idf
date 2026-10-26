@@ -188,4 +188,5 @@ const stationAtLowZoom=alignedContext.alignedStationCoord('Metro A',[0.5,0],11);
 const stationAtHighZoom=alignedContext.alignedStationCoord('Metro A',[0.5,0],13);
 assert.deepEqual(Array.from(stationAtLowZoom),[0.5,0],'low-zoom station positions must remain on the base route');
 assert.ok(Math.abs(stationAtHighZoom[0]-0.5)<1e-9&&Math.abs(stationAtHighZoom[1]-0.01)<1e-9,'high-zoom station markers must project onto the actual offset segment');
-\nconsole.log('Route topology tests passed: 7 junction/station anchoring cases plus offset-join regressions.');
+
+console.log('Route topology tests passed: repeated-vertex repair, junction/station anchoring, and offset-join regressions.');
