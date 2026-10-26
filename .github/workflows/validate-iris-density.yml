@@ -19,6 +19,7 @@ on:
       - "tools/audit-route-overlaps.cjs"
       - "tools/test-route-overlap-audit.cjs"
       - "assets/network-data.json"
+      - "assets/official-rail-traces.json"
       - "tools/test-iris-browser.mjs"
       - ".github/workflows/validate-iris-density.yml"
   pull_request:
