@@ -77,7 +77,7 @@ jobs:
           if len(features)<500 or len(lines)<20 or 'RER C' not in lines or 'TRAM 6' not in lines:
               raise SystemExit('Generated official IDFM asset failed validation')
           PY
-          if git diff --quiet -- assets/official-rail-traces.json; then
+          if git ls-files --error-unmatch assets/official-rail-traces.json >/dev/null 2>&1 && git diff --quiet -- assets/official-rail-traces.json; then
             echo "Official IDFM asset is already current."
           else
             git config user.name "github-actions[bot]"
