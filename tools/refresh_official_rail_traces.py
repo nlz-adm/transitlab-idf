@@ -32,6 +32,7 @@ def mode_for(line, raw=""):
 
 def normalize_line(value):
     value = " ".join(value.upper().replace("-", " ").split())
+    value = value.replace("TRAMWAY T", "TRAM ").replace("TRAM T", "TRAM ").replace("METRO M", "METRO ")
     # Align official labels with the stable labels already used by the app.
     replacements = {
         "METRO M1": "METRO 1", "METRO M2": "METRO 2", "METRO M3": "METRO 3",
