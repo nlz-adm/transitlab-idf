@@ -20,10 +20,19 @@ vm.createContext(splitContext);
 vm.runInContext(splitterMatch[0], splitContext);
 const malformedBranch = [{properties:{line:'TRAM 6',mode:'Tramway'},geometry:{type:'LineString',coordinates:[[2.178798,48.785121],[2.171307,48.800716],[2.178798,48.785121],[2.176976,48.784057],[2.176848,48.783692]]}}];
 const splitBranch = splitContext.splitRepeatedRouteChains(malformedBranch);
-assert.equal(splitBranch.length, 2, 'a repeated interior vertex must split the accidental connector into independent branches');
-assert.deepEqual(Array.from(splitBranch[0].geometry.coordinates), [[2.178798,48.785121],[2.171307,48.800716]], 'the first branch must stop before the spurious return segment');
-assert.deepEqual(Array.from(splitBranch[1].geometry.coordinates), [[2.178798,48.785121],[2.176976,48.784057],[2.176848,48.783692]], 'the second branch must restart at the repeated junction');
-\nconst normalizerMatch = source.match(/function normalizeSharedTrackSegmentation\(lines\)\{[\s\S]*?\n\}/);
+assert.equal(splitBranch.length, 1, 'a repeated interior vertex at the start of a concatenated branch must be repaired as one continuous route');
+assert.deepEqual(Array.from(splitBranch[0].geometry.coordinates), [[2.171307,48.800716],[2.178798,48.785121],[2.176976,48.784057],[2.176848,48.783692]], 'the route must reverse the first branch at the repeated junction and continue without a long artificial return segment');
+const networkForSplitTest = JSON.parse(fs.readFileSync('assets/network-data.json','utf8'));
+const splitRealNetwork = splitContext.splitRepeatedRouteChains(networkForSplitTest.lines);
+const coordKeyForSplit = c => Number(c[0]).toFixed(9)+','+Number(c[1]).toFixed(9);
+let interiorRepeatsAfterSplit=0;
+for(const feature of splitRealNetwork){
+ const coords=feature.geometry?.coordinates||[],seen=new Set();
+ for(let i=0;i<coords.length;i++){const key=coordKeyForSplit(coords[i]);if(seen.has(key)&&i<coords.length-1)interiorRepeatsAfterSplit++;seen.add(key)}
+}
+assert.equal(interiorRepeatsAfterSplit, 0, 'the real network must contain no accidental mid-chain returns after route-chain repair');
+assert.ok(splitRealNetwork.length >= networkForSplitTest.lines.length, 'route-chain repair must preserve all route geometry as valid line features');
+const normalizerMatch = source.match(/function normalizeSharedTrackSegmentation\(lines\)\{[\s\S]*?\n\}/);
 assert.ok(normalizerMatch, 'map-app.js must normalize shared route segmentation before indexing');
 const normalizeContext = {};
 vm.createContext(normalizeContext);
