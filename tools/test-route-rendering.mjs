@@ -96,6 +96,53 @@ try {
       throw new Error('Station-to-route alignment failed at Viroflay Rive Gauche: ' + JSON.stringify(result));
     }
   }
+
+  // Re-check the same transfer markers at both a wider and a closer zoom.
+  // Leaflet markers and route paths must remain attached as scale changes.
+  for (const zoom of [11, 17]) {
+    await page.evaluate(level => window.__transitLabMap.setView([48.8007, 2.1713], level, { animate: false }), zoom);
+    await page.waitForTimeout(250);
+    const zoomAlignment = await page.evaluate(() => {
+      const map = window.__transitLabMap;
+      const all = [], seen = new Set();
+      const walk = layer => {
+        if (!layer || seen.has(layer)) return;
+        seen.add(layer); all.push(layer);
+        if (typeof layer.eachLayer === 'function') layer.eachLayer(walk);
+      };
+      map.eachLayer(walk);
+      const lines = all.filter(layer => layer.feature?.properties?.line && layer.feature?.geometry?.type === 'LineString' && typeof layer.getLatLngs === 'function');
+      const markers = all.filter(layer => layer._transferLine && Array.isArray(layer._transferRawCoord));
+      const targets = [
+        { line: 'RER C', raw: [2.17139, 48.800718] },
+        { line: 'TRAIN N', raw: [2.17139, 48.800718] },
+        { line: 'TRAM 6', raw: [2.17096740107903, 48.80107761141683] },
+      ];
+      const segmentDistance = (p, a, b) => {
+        const dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;
+        const t=l2?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l2)):0;
+        return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy));
+      };
+      return targets.map(target => {
+        const marker = markers.find(layer => layer._transferLine === target.line && Math.hypot((layer._transferRawCoord[0]-target.raw[0])*111320*Math.cos(target.raw[1]*Math.PI/180),(layer._transferRawCoord[1]-target.raw[1])*111320)<35);
+        const routes = lines.filter(layer => layer.feature.properties.line === target.line);
+        if (!marker || !routes.length) return { line: target.line, markerFound: !!marker, routeFeatureCount: routes.length, distancePx: null };
+        const p = map.latLngToContainerPoint(marker.getLatLng());
+        let distancePx = Infinity;
+        for (const route of routes) {
+          const coords = route.getLatLngs();
+          for (let i=1;i<coords.length;i++) distancePx=Math.min(distancePx,segmentDistance(p,map.latLngToContainerPoint(coords[i-1]),map.latLngToContainerPoint(coords[i])));
+        }
+        return { line: target.line, markerFound: true, routeFeatureCount: routes.length, distancePx: Math.round(distancePx*100)/100 };
+      });
+    });
+    for (const result of zoomAlignment) {
+      if (!result.markerFound || result.routeFeatureCount < 1 || result.distancePx > 18) {
+        throw new Error('Station-to-route alignment failed at zoom ' + zoom + ': ' + JSON.stringify(result));
+      }
+    }
+    console.log(JSON.stringify({ result: 'PASS', zoom, stationAlignment: zoomAlignment }));
+  }
   if (failures.length) throw new Error('Browser JavaScript errors: ' + failures.join(' | '));
   console.log(JSON.stringify({ result: 'PASS', modeIcons: expected.map(x=>x[0]), stationAlignmentAtZoom14: alignment }, null, 2));
 } finally {
