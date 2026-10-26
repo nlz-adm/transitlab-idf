@@ -69,7 +69,7 @@ function splitRepeatedRouteChains(lines){
  const repairChain=(feature,initial)=>{
   let coords=initial.map(coord=>coord.slice()),guard=0;
   while(coords.length>=2&&guard++<initial.length+2){
-   const seen=new Map(),repeat=null;
+   const seen=new Map();let repeat=null;
    for(let i=0;i<coords.length;i++){
     const key=coordKey(coords[i]);
     if(seen.has(key)&&i<coords.length-1){repeat={start:seen.get(key),end:i};break}
