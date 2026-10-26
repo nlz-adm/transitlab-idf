@@ -21,14 +21,14 @@ const sharedTrackEdges=new Map(),sharedTrackVertices=new Map(),shiftedFeatureCac
 function railCoordKey(c){return Number(c[0]).toFixed(5)+','+Number(c[1]).toFixed(5)}
 function railEdgeKey(a,b){const ka=railCoordKey(a),kb=railCoordKey(b);return ka<kb?ka+'|'+kb:kb+'|'+ka}
 function normalizeSharedTrackSegmentation(lines){
- const gridStep=.0001,toleranceMeters=1.25,grid=new Map(),points=[];
+ const gridStep=.0001,toleranceMeters=.35,grid=new Map(),points=[];
  const key=(x,y)=>Math.floor(x/gridStep)+','+Math.floor(y/gridStep);
  for(const feature of lines||[]){
   const geometry=feature.geometry;if(!geometry||!['LineString','MultiLineString'].includes(geometry.type))continue;
   const chains=geometry.type==='MultiLineString'?geometry.coordinates:[geometry.coordinates];
   for(const coords of chains||[])for(const coord of coords||[]){
    if(!Array.isArray(coord)||coord.length<2)continue;
-   const point={coord:[Number(coord[0]),Number(coord[1])]};
+   const point={coord:[Number(coord[0]),Number(coord[1])],line:String(feature.properties?.line||'')};
    if(!point.coord.every(Number.isFinite))continue;
    points.push(point);const cell=key(point.coord[0],point.coord[1]);
    if(!grid.has(cell))grid.set(cell,[]);grid.get(cell).push(point);
@@ -48,7 +48,7 @@ function normalizeSharedTrackSegmentation(lines){
     const minX=Math.floor(Math.min(a[0],b[0])/gridStep),maxX=Math.floor(Math.max(a[0],b[0])/gridStep);
     const minY=Math.floor(Math.min(a[1],b[1])/gridStep),maxY=Math.floor(Math.max(a[1],b[1])/gridStep),candidates=new Map();
     for(let gx=minX-1;gx<=maxX+1;gx++)for(let gy=minY-1;gy<=maxY+1;gy++)for(const point of grid.get(gx+','+gy)||[]){
-     const p=point.coord;if((p[0]===a[0]&&p[1]===a[1])||(p[0]===b[0]&&p[1]===b[1]))continue;
+     const p=point.coord;if(point.line===String(feature.properties?.line||''))continue;if((p[0]===a[0]&&p[1]===a[1])||(p[0]===b[0]&&p[1]===b[1]))continue;
      const px=(p[0]-a[0])*metersPerDegree*latScale,py=(p[1]-a[1])*metersPerDegree,t=(px*dx+py*dy)/len2;
      if(t<=1e-6||t>=1-1e-6)continue;
      const distance=Math.hypot(px-t*dx,py-t*dy);if(distance>toleranceMeters)continue;
