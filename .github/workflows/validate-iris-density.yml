@@ -61,23 +61,54 @@ jobs:
         run: |
           npm install --no-save playwright
           npx playwright install --with-deps chromium
-      - name: Start local static server
+      - name: Start current branch static server
         run: |
-          python -m http.server 4173 --bind 127.0.0.1 > /tmp/transitlab-http.log 2>&1 &
-          echo $! > /tmp/transitlab-http.pid
+          python -m http.server 4173 --bind 127.0.0.1 > /tmp/transitlab-head-http.log 2>&1 &
+          echo $! > /tmp/transitlab-head-http.pid
           for i in $(seq 1 30); do
             if curl --silent --fail http://127.0.0.1:4173/carte-interactive-ile-de-france.html > /dev/null; then exit 0; fi
             sleep 1
           done
-          cat /tmp/transitlab-http.log
+          cat /tmp/transitlab-head-http.log
           exit 1
-      - name: Smoke-test the IRIS map in Chromium
+      - name: Benchmark current branch in Chromium
+        run: IRIS_BENCHMARK_LABEL=head IRIS_SCREENSHOT_PATH=/tmp/iris-map-smoke-head.png node tools/test-iris-browser.mjs
+      - name: Prepare baseline from main
+        run: |
+          git fetch origin main
+          git worktree add --detach /tmp/transitlab-baseline origin/main
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('/tmp/transitlab-baseline/assets/map-app.js')
+          source = path.read_text(encoding='utf-8')
+          marker = "const map=L.map('map',{zoomControl:true,preferCanvas:true,renderer:L.canvas({padding:.2})}).setView([48.79,2.43],9);"
+          if source.count(marker) != 1:
+              raise SystemExit('Impossible d’injecter le hook de test dans le point d’initialisation Leaflet de main.')
+          path.write_text(source.replace(marker, marker + "if(new URLSearchParams(location.search).has('test'))window.__transitLabMap=map;", 1), encoding='utf-8')
+          PY
+      - name: Start baseline static server
+        run: |
+          cd /tmp/transitlab-baseline
+          python -m http.server 4174 --bind 127.0.0.1 > /tmp/transitlab-base-http.log 2>&1 &
+          echo $! > /tmp/transitlab-base-http.pid
+          for i in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:4174/carte-interactive-ile-de-france.html > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/transitlab-base-http.log
+          exit 1
+      - name: Benchmark baseline main in Chromium
+        env:
+          TRANSITLAB_TEST_URL: http://127.0.0.1:4174/carte-interactive-ile-de-france.html
+          IRIS_LABEL_MAX_MS: "0"
+          IRIS_BENCHMARK_LABEL: main-baseline
+          IRIS_SCREENSHOT_PATH: /tmp/iris-map-smoke-base.png
         run: node tools/test-iris-browser.mjs
-      - name: Upload IRIS browser screenshot
+      - name: Upload IRIS browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: iris-map-browser-screenshot
-          path: /tmp/iris-map-smoke.png
+          name: iris-map-browser-screenshots
+          path: /tmp/iris-map-smoke-*.png
           if-no-files-found: error
           retention-days: 7
