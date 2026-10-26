@@ -34,6 +34,7 @@ on:
       - "tools/test-iris-map-logic.cjs"
       - "tools/test-iris-browser.mjs"
       - "tools/test-route-topology.cjs"
+      - "tools/test-route-rendering.mjs"
       - "tools/test-route-overlap-audit.cjs"
       - "tools/audit-route-overlaps.cjs"
       - "assets/network-data.json"
