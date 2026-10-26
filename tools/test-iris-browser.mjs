@@ -11,7 +11,7 @@ try {
     }
   });
 
-  const response = await page.goto('http://127.0.0.1:4173/carte-interactive-ile-de-france.html', {
+  const response = await page.goto('http://127.0.0.1:4173/carte-interactive-ile-de-france.html?test=1', {
     waitUntil: 'domcontentloaded',
     timeout: 30000,
   });
@@ -27,15 +27,15 @@ try {
     return legend && !legend.hidden;
   }, null, { timeout: 30000 });
 
-  // Zoom from the default level 9 to the IRIS threshold (12).
-  for (let i = 0; i < 3; i++) await page.locator('.leaflet-control-zoom-in').click();
-  await page.waitForTimeout(1200);
+  // Drive the map to a deterministic central-Paris viewport for stable IRIS coverage.
+  await page.waitForFunction(() => !!window.__transitLabMap, null, { timeout: 10000 });
+  await page.evaluate(() => window.__transitLabMap.setView([48.8566, 2.3522], 12));
+  await page.waitForTimeout(1500);
   const irisFeatures = await page.evaluate(() => document.querySelectorAll('.leaflet-population-density-pane canvas, .leaflet-population-density-pane path').length);
   if (irisFeatures < 1) throw new Error('Le moteur de rendu de la couche IRIS n’est pas présent dans son panneau Leaflet.');
 
-  // Zoom to the neighborhood-label threshold (15), then verify the label layer
-  // has at least one visible candidate in the initial Île-de-France viewport.
-  for (let i = 0; i < 3; i++) await page.locator('.leaflet-control-zoom-in').click();
+  // Move to neighborhood scale explicitly and wait for the asynchronous IRIS refresh.
+  await page.evaluate(() => window.__transitLabMap.setView([48.8566, 2.3522], 15));
   await page.waitForTimeout(3000);
   const labelDiagnostics = await page.evaluate(() => ({
     labels: document.querySelectorAll('.iris-name-label').length,
