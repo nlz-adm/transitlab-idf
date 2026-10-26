@@ -52,7 +52,7 @@ jobs:
       - name: Commit updated official geometry
         run: |
           set -euo pipefail
-          if git diff --quiet -- assets/official-rail-traces.json; then
+          if git ls-files --error-unmatch assets/official-rail-traces.json >/dev/null 2>&1 && git diff --quiet -- assets/official-rail-traces.json; then
             echo "Official geometry unchanged."
             exit 0
           fi
