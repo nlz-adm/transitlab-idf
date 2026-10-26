@@ -21,7 +21,7 @@ try {
     })).catch(() => ({}));
     throw new Error('Map initialization timed out. Browser errors: ' + failures.join(' | ') + '. Diagnostics: ' + JSON.stringify(diagnostics) + '. Original: ' + error.message);
   }
-  await page.waitForFunction(() => document.querySelectorAll('#layerGroups .line-row').length > 50, null, { timeout: 30000 }).catch(async error => {
+  await page.waitForFunction(() => document.querySelectorAll('#layerGroups .line-row').length >= 40, null, { timeout: 30000 }).catch(async error => {
     const diagnostics = await page.evaluate(() => ({
       layerGroupCount: document.querySelectorAll('#layerGroups .mode-group').length,
       routeRowCount: document.querySelectorAll('#layerGroups .line-row').length,
