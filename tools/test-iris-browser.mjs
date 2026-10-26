@@ -34,7 +34,8 @@ try {
   const irisFeatures = await page.evaluate(() => document.querySelectorAll('.leaflet-population-density-pane canvas, .leaflet-population-density-pane path').length);
   if (irisFeatures < 1) throw new Error('Le moteur de rendu de la couche IRIS n’est pas présent dans son panneau Leaflet.');
 
-  // Move to neighborhood scale explicitly and wait for the asynchronous IRIS refresh.
+  // Move to neighborhood scale explicitly and measure the asynchronous IRIS refresh.
+  const labelRefreshStarted = Date.now();
   await page.evaluate(() => { window.__transitLabMap.setView([48.8566, 2.3522], 15); });
   try {
     await page.waitForFunction(() => document.querySelectorAll('.iris-name-label').length > 0, null, { timeout: 30000 });
@@ -51,6 +52,8 @@ try {
     throw new Error('Aucune étiquette IRIS au zoom de quartier après 30 s. Diagnostic navigateur : ' + JSON.stringify(labelDiagnostics));
   }
 
+  const labelRefreshMs = Date.now() - labelRefreshStarted;
+  const labelCount = await page.locator('.iris-name-label').count();
   await densityToggle.uncheck();
   await page.locator('#communesBoundaryToggle').check();
   await page.waitForTimeout(500);
@@ -61,7 +64,9 @@ try {
     map: 'Leaflet initialisée',
     densityLegend: 'visible après activation',
     densityPaneRendererElements: irisFeatures,
-    neighborhoodLabels: await page.locator('.iris-name-label').count(),
+    neighborhoodLabels: labelCount,
+    zoomToFirstNeighborhoodLabelMs: labelRefreshMs,
+    irisDataRequests: await page.evaluate(() => performance.getEntriesByType('resource').filter(entry => /population-iris/.test(entry.name)).map(entry => ({ resource: entry.name.split('/').pop(), durationMs: Math.round(entry.duration), transferBytes: entry.transferSize || null }))),
     consolePageErrors: errors.length,
   }, null, 2));
 } finally {
