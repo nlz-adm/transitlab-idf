@@ -29,11 +29,10 @@ try {
     if (state.mode !== mode || state.selected !== mode) throw new Error('Mode picker failed to select ' + mode + ': ' + JSON.stringify(state));
     const iconLoaded = await button.locator('img').evaluate((img, expectedFile) => img.complete && img.naturalWidth > 0 && img.getAttribute('src').endsWith(expectedFile), filename);
     if (!iconLoaded) throw new Error('Missing or incorrect transport icon for ' + mode);
-    const previewLoaded = await page.evaluate(() => {
+    await page.waitForFunction(expectedFile => {
       const image = document.getElementById('customLogoPreviewImage');
-      return !!image && image.complete && image.naturalWidth > 0;
-    });
-    if (!previewLoaded) throw new Error('Mode preview icon did not load for ' + mode);
+      return !!image && image.complete && image.naturalWidth > 0 && image.getAttribute('src').endsWith(expectedFile);
+    }, filename, { timeout: 5000 }).catch(() => { throw new Error('Mode preview icon did not load for ' + mode); });
   }
 
   await page.evaluate(() => {
