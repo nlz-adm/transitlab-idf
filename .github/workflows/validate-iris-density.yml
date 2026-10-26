@@ -27,6 +27,7 @@ on:
       - "sw.js"
       - "tools/validate-iris-density.py"
       - "tools/test-iris-map-logic.cjs"
+      - "tools/test-iris-browser.mjs"
       - ".github/workflows/validate-iris-density.yml"
   workflow_dispatch:
 
@@ -78,5 +79,5 @@ jobs:
         with:
           name: iris-map-browser-screenshot
           path: /tmp/iris-map-smoke.png
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 7
