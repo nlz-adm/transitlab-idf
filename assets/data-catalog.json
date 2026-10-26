@@ -45,7 +45,7 @@
     },
     "app": {
       "url": "assets/map-app.js",
-      "bytes": 147187
+      "bytes": 147159
     },
     "worker": {
       "url": "assets/line-index-worker.js",
