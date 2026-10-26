@@ -44,6 +44,33 @@ assert.deepEqual(
  'nearby parallel routes must not be snapped into one shared segmentation'
 );
 const coordKey = c => Number(c[0]).toFixed(5) + ',' + Number(c[1]).toFixed(5);
+const networkData = JSON.parse(fs.readFileSync('assets/network-data.json', 'utf8'));
+const countSharedEdges = lines => {
+  const edges = new Map();
+  for (const feature of lines) {
+    const geometry = feature.geometry;
+    if (!geometry || !['LineString', 'MultiLineString'].includes(geometry.type)) continue;
+    const chains = geometry.type === 'MultiLineString' ? geometry.coordinates : [geometry.coordinates];
+    for (const coords of chains || []) {
+      for (let i = 1; i < (coords || []).length; i++) {
+        const a = coordKey(coords[i - 1]), b = coordKey(coords[i]);
+        const key = a < b ? a + '|' + b : b + '|' + a;
+        if (!edges.has(key)) edges.set(key, new Set());
+        edges.get(key).add(String(feature.properties?.line || ''));
+      }
+    }
+  }
+  return [...edges.values()].filter(lines => lines.size > 1).length;
+};
+const realLinesBefore = JSON.parse(JSON.stringify(networkData.lines));
+const sharedEdgesBefore = countSharedEdges(realLinesBefore);
+const realLinesAfter = normalizeContext.normalizeSharedTrackSegmentation(JSON.parse(JSON.stringify(networkData.lines)));
+const sharedEdgesAfter = countSharedEdges(realLinesAfter);
+assert.ok(sharedEdgesAfter > sharedEdgesBefore,
+  'normalization must recover shared segments in the real network dataset');
+assert.ok(sharedEdgesAfter >= 209,
+  'real network should expose at least 209 shared edges after normalization');
+
 const stationKey = (lng, lat) => [Number(lng).toFixed(5), Number(lat).toFixed(5)].join(',');
 const edgeKey = (a, b) => {
   const ka = coordKey(a), kb = coordKey(b);
