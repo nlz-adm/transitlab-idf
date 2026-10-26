@@ -57,6 +57,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          git fetch origin "$GITHUB_HEAD_REF"
+          git checkout -B "$GITHUB_HEAD_REF" "origin/$GITHUB_HEAD_REF"
           curl --fail --show-error --location --retry 5 --retry-all-errors --connect-timeout 30 --max-time 180 "https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/traces-du-reseau-ferre-idf/exports/geojson" --output /tmp/rail-source.geojson
           python - <<'PY'
           import gzip
