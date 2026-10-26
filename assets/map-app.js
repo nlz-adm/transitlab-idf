@@ -23,22 +23,26 @@ function railEdgeKey(a,b){const ka=railCoordKey(a),kb=railCoordKey(b);return ka<
 const buildSharedTrackIndex=lines=>{if(!window.Worker)return Promise.resolve(null);return new Promise(resolve=>{let worker;try{worker=new Worker(new URL('assets/line-index-worker.js',document.baseURI),{type:'module'})}catch{resolve(null);return}const done=value=>{worker.terminate();resolve(value)};worker.onmessage=event=>done(event.data);worker.onerror=()=>done(null);worker.postMessage({type:'indexSharedTracks',lines})})};
 const sharedIndex=await buildSharedTrackIndex(DATA.lines);
 if(sharedIndex?.edges){for(const record of sharedIndex.edges){const edge={a:record.a,b:record.b,lines:new Set(record.lines),offsets:new Map(record.offsets)};sharedTrackEdges.set(railEdgeKey(edge.a,edge.b),edge);for(const coord of [edge.a,edge.b]){const vertexKey=railCoordKey(coord);if(!sharedTrackVertices.has(vertexKey))sharedTrackVertices.set(vertexKey,[]);sharedTrackVertices.get(vertexKey).push(edge)}}}else{for(const feature of DATA.lines){const name=feature.properties.line,coordinates=feature.geometry.coordinates;if(feature.geometry.type!=='LineString')continue;for(let i=1;i<coordinates.length;i++){const a=coordinates[i-1],b=coordinates[i],key=railEdgeKey(a,b);let edge=sharedTrackEdges.get(key);if(!edge){edge={a:a.slice(),b:b.slice(),lines:new Set(),offsets:new Map()};sharedTrackEdges.set(key,edge)}edge.lines.add(name)}}for(const [key,edge] of sharedTrackEdges){if(edge.lines.size<2){sharedTrackEdges.delete(key);continue}const names=[...edge.lines].sort((a,b)=>a.localeCompare(b,'fr',{numeric:true}));names.forEach((name,index)=>edge.offsets.set(name,index-(names.length-1)/2));for(const coord of [edge.a,edge.b]){const vertexKey=railCoordKey(coord);if(!sharedTrackVertices.has(vertexKey))sharedTrackVertices.set(vertexKey,[]);sharedTrackVertices.get(vertexKey).push(edge)}}}
-const railUnsharedVerticesByLine=new Map();
-for(const feature of DATA.lines||[]){
- const name=String(feature.properties?.line||''),geometry=feature.geometry;
- if(!name||!geometry)continue;
- const chains=geometry.type==='MultiLineString'?geometry.coordinates:[geometry.coordinates];
- for(const coords of chains||[]){
-  for(let i=1;i<coords.length;i++){
-   const a=coords[i-1],b=coords[i],edge=sharedTrackEdges.get(railEdgeKey(a,b));
-   if(edge?.offsets.has(name))continue;
-   for(const coord of [a,b]){
-    if(!railUnsharedVerticesByLine.has(name))railUnsharedVerticesByLine.set(name,new Set());
-    railUnsharedVerticesByLine.get(name).add(railCoordKey(coord));
+function buildRailUnsharedVertices(lines,edges,edgeKey,coordKey){
+ const pinned=new Map();
+ for(const feature of lines||[]){
+  const name=String(feature.properties?.line||''),geometry=feature.geometry;
+  if(!name||!geometry)continue;
+  const chains=geometry.type==='MultiLineString'?geometry.coordinates:[geometry.coordinates];
+  for(const coords of chains||[]){
+   for(let i=1;i<coords.length;i++){
+    const a=coords[i-1],b=coords[i],edge=edges.get(edgeKey(a,b));
+    if(edge?.offsets.has(name))continue;
+    for(const coord of [a,b]){
+     if(!pinned.has(name))pinned.set(name,new Set());
+     pinned.get(name).add(coordKey(coord));
+    }
    }
   }
  }
+ return pinned;
 }
+const railUnsharedVerticesByLine=buildRailUnsharedVertices(DATA.lines,sharedTrackEdges,railEdgeKey,railCoordKey);
 function isRailVertexPinned(name,coord){return railUnsharedVerticesByLine.get(name)?.has(railCoordKey(coord))||false}
 function railNormal(edge,zoom){const a=map.project([edge.a[1],edge.a[0]],zoom),b=map.project([edge.b[1],edge.b[0]],zoom),dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy)||1;return[-dy/length,dx/length]}
 function offsetRailCoordinate(coord,name,zoom,spacing=5,neighbors=[]){if(isRailVertexPinned(name,coord))return coord.slice();let dx=0,dy=0,count=0;for(const pair of neighbors){const edge=sharedTrackEdges.get(railEdgeKey(pair[0],pair[1]));if(!edge||!edge.offsets.has(name))continue;const normal=railNormal(edge,zoom),amount=edge.offsets.get(name)*spacing;dx+=normal[0]*amount;dy+=normal[1]*amount;count++}if(!count)return coord.slice();const point=map.project([coord[1],coord[0]],zoom);const shifted=map.unproject(L.point(point.x+dx/count,point.y+dy/count),zoom);return[shifted.lng,shifted.lat]}
