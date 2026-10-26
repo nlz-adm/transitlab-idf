@@ -13,7 +13,7 @@ assert.ok(builder, 'map-app.js must expose the real route-topology index builder
 assert.ok(predicate, 'map-app.js must expose the real junction-pinning helper');
 assert.ok(stationPinner, 'map-app.js must expose the real station anchoring helper');
 
-const normalizerMatch = fs.readFileSync('assets/map-app.js', 'utf8').match(/function normalizeSharedTrackSegmentation\\(lines\\)\\{[\\s\\S]*?\\n\\}/);
+const normalizerMatch = source.match(/function normalizeSharedTrackSegmentation\(lines\)\{[\s\S]*?\n\}/);
 assert.ok(normalizerMatch, 'map-app.js must normalize shared route segmentation before indexing');
 const normalizeContext = {};
 vm.createContext(normalizeContext);
