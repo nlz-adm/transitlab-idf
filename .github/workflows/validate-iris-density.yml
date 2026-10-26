@@ -62,9 +62,9 @@ jobs:
           import gzip
           from pathlib import Path
           source=Path('/tmp/rail-source.geojson').read_bytes()
-          decoded=gzip.decompress(source) if source.startswith(b'\\x1f\\x8b') else source
+          decoded=gzip.decompress(source) if source.startswith(b'\x1f\x8b') else source
           Path('/tmp/rail-source-decoded.geojson').write_bytes(decoded)
-          print(f"Decoded official export: {len(decoded)} bytes; gzip={source.startswith(b'\\x1f\\x8b')}")
+          print(f"Decoded official export: {len(decoded)} bytes; gzip={source.startswith(b'\x1f\x8b')}")
           PY
           python tools/refresh_official_rail_traces.py /tmp/rail-source-decoded.geojson assets/official-rail-traces.json
           python - <<'PY'
