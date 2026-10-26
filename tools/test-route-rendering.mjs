@@ -39,13 +39,12 @@ try {
   await page.selectOption('#stationNamesMode', 'all');
   await page.locator('#stationNamesMode').dispatchEvent('change');
 
-  // Measure each line-specific station marker against its own offset route geometry.
-  // Transfer mode intentionally replaces coincident station markers with one shared
-  // hub marker; that hub is centered between parallel routes and is not expected to
-  // sit directly on every individual route.
+  // Keep transfer stations enabled: this is the production default and the
+  // regression that previously escaped CI. Shared hub markers should sit at the
+  // midpoint of the visible line-specific offset geometries.
   const transferToggle = page.locator('#transferToggle');
-  if (await transferToggle.isChecked()) {
-    await transferToggle.uncheck();
+  if (!(await transferToggle.isChecked())) {
+    await transferToggle.check();
     await transferToggle.dispatchEvent('change');
   }
   await page.waitForTimeout(500);
