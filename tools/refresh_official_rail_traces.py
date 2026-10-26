@@ -40,6 +40,10 @@ def normalize_line(value):
         "METRO M10": "METRO 10", "METRO M11": "METRO 11", "METRO M12": "METRO 12",
         "METRO M13": "METRO 13", "METRO M14": "METRO 14",
     }
+    if value.startswith("M") and value[1:].isdigit():
+        value = "METRO " + value[1:]
+    elif value.startswith("T") and value[1:].isdigit():
+        value = "TRAM " + value[1:]
     return replacements.get(value, value)
 
 def main():
@@ -54,8 +58,8 @@ def main():
         coords = geometry.get("coordinates")
         if not coords:
             continue
-        raw_line = pick(props, "idrefligc", "IDREFLIGC", "id_ref_lig_c", "id_ilico",
-                        "nomlong", "nom_long", "route_short_name", "line", "libelle", "nom")
+        raw_line = pick(props, "nomlong", "nom_long", "route_long_name", "route_short_name", "line", "libelle", "nom",
+                        "idrefligc", "IDREFLIGC", "id_ref_lig_c", "id_ilico")
         if not raw_line:
             continue
         line = normalize_line(raw_line)
