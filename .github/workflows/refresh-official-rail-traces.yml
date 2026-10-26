@@ -1,0 +1,41 @@
+name: Refresh official rail traces
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+  push:
+    paths:
+      - "tools/refresh_official_rail_traces.py"
+      - ".github/workflows/refresh-official-rail-traces.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Download official Île-de-France Mobilités rail traces
+        run: |
+          curl --fail --location --retry 3 \
+            "https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/traces-du-reseau-ferre-idf/exports/geojson" \
+            --output /tmp/rail-source.geojson
+          python -m json.tool /tmp/rail-source.geojson >/dev/null
+      - name: Normalize and validate source
+        run: python tools/refresh_official_rail_traces.py /tmp/rail-source.geojson assets/official-rail-traces.json
+      - name: Commit updated official geometry
+        run: |
+          if git diff --quiet -- assets/official-rail-traces.json; then
+            echo "Official geometry unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/official-rail-traces.json
+          git commit -m "Refresh official IDFM rail geometry"
+          git push
