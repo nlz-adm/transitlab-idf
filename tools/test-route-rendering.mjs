@@ -9,7 +9,7 @@ try {
   url.searchParams.set('test', '1');
   const response = await page.goto(url.toString(), { waitUntil: 'domcontentloaded', timeout: 30000 });
   if (!response?.ok()) throw new Error('TransitLab did not return HTTP success.');
-  await page.waitForFunction(() => !!window.__transitLabMap && !!document.querySelector('#customModePicker'), null, { timeout: 30000 });
+  await page.waitForFunction(() => !!window.__transitLabMap && !!document.querySelector('#customModePicker') && document.querySelectorAll('#layerGroups .line-row').length > 50, null, { timeout: 30000 });
   await page.waitForFunction(() => [...document.querySelectorAll('#customModePicker img')].length === 4 && [...document.querySelectorAll('#customModePicker img')].every(img => img.complete && img.naturalWidth > 0), null, { timeout: 15000 });
 
   const expected = [
