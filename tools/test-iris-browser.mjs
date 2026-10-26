@@ -30,8 +30,8 @@ try {
   // Zoom from the default level 9 to the IRIS threshold (12).
   for (let i = 0; i < 3; i++) await page.locator('.leaflet-control-zoom-in').click();
   await page.waitForTimeout(1200);
-  const irisFeatures = await page.evaluate(() => document.querySelectorAll('.leaflet-overlay-pane canvas, .leaflet-overlay-pane path').length);
-  if (irisFeatures < 1) throw new Error('Aucun moteur de rendu vectoriel Leaflet n’est présent après activation de la densité.');
+  const irisFeatures = await page.evaluate(() => document.querySelectorAll('.leaflet-population-density-pane canvas, .leaflet-population-density-pane path').length);
+  if (irisFeatures < 1) throw new Error('Le moteur de rendu de la couche IRIS n’est pas présent dans son panneau Leaflet.');
 
   // Zoom to the neighborhood-label threshold (15), then verify the label layer
   // has at least one visible candidate in the initial Île-de-France viewport.
@@ -47,7 +47,7 @@ try {
     result: 'PASS',
     map: 'Leaflet initialisée',
     densityLegend: 'visible après activation',
-    renderedGeometryPaths: irisFeatures,
+    densityPaneRendererElements: irisFeatures,
     neighborhoodLabels: await page.locator('.iris-name-label').count(),
     consolePageErrors: errors.length,
   }, null, 2));
