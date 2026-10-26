@@ -1,6 +1,19 @@
 name: Validate IRIS density data
 
 on:
+  push:
+    branches:
+      - "perf/iris-label-centers"
+    paths:
+      - "assets/population-iris-index.json"
+      - "assets/population-iris/**"
+      - "assets/map-app.js"
+      - "assets/map-boot.js"
+      - "assets/data-catalog.json"
+      - "carte-interactive-ile-de-france.html"
+      - "sw.js"
+      - "tools/validate-iris-density.py"
+      - ".github/workflows/validate-iris-density.yml"
   pull_request:
     paths:
       - "assets/population-iris-index.json"
