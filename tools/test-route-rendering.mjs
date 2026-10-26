@@ -38,7 +38,17 @@ try {
   // marker exists to measure even though the underlying route geometry is present.
   await page.selectOption('#stationNamesMode', 'all');
   await page.locator('#stationNamesMode').dispatchEvent('change');
-  await page.waitForTimeout(300);
+
+  // Measure each line-specific station marker against its own offset route geometry.
+  // Transfer mode intentionally replaces coincident station markers with one shared
+  // hub marker; that hub is centered between parallel routes and is not expected to
+  // sit directly on every individual route.
+  const transferToggle = page.locator('#transferToggle');
+  if (await transferToggle.isChecked()) {
+    await transferToggle.uncheck();
+    await transferToggle.dispatchEvent('change');
+  }
+  await page.waitForTimeout(500);
 
   const expected = [
     ['Metro', 'mode-metro.png'],
