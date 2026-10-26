@@ -21,8 +21,16 @@ try {
     })).catch(() => ({}));
     throw new Error('Map initialization timed out. Browser errors: ' + failures.join(' | ') + '. Diagnostics: ' + JSON.stringify(diagnostics) + '. Original: ' + error.message);
   }
+  await page.waitForFunction(() => document.querySelectorAll('#layerGroups .line-row').length > 50, null, { timeout: 30000 }).catch(async error => {
+    const diagnostics = await page.evaluate(() => ({
+      layerGroupCount: document.querySelectorAll('#layerGroups .mode-group').length,
+      routeRowCount: document.querySelectorAll('#layerGroups .line-row').length,
+      layerGroupsText: document.getElementById('layerGroups')?.textContent?.slice(0, 300),
+      totalCount: document.getElementById('totalCount')?.textContent,
+    })).catch(() => ({}));
+    throw new Error('Route list did not finish rendering. Diagnostics: ' + JSON.stringify(diagnostics) + '. Original: ' + error.message);
+  });
   const loadedLayerCount = await page.locator('#layerGroups .line-row').count();
-  if (loadedLayerCount < 1) throw new Error('Map initialized but no route entries were rendered in the layer list.');
   await page.waitForFunction(() => [...document.querySelectorAll('#customModePicker img')].length === 4 && [...document.querySelectorAll('#customModePicker img')].every(img => img.complete && img.naturalWidth > 0), null, { timeout: 15000 });
 
   const expected = [
