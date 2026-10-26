@@ -29,7 +29,14 @@ jobs:
             "https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/traces-du-reseau-ferre-idf/exports/geojson" \
             --output /tmp/rail-source.geojson
           echo "Downloaded source size: $(wc -c < /tmp/rail-source.geojson) bytes"
-          gzip -dc /tmp/rail-source.geojson > /tmp/rail-source-decoded.geojson
+          python - <<'PY'
+          import gzip
+          from pathlib import Path
+          source=Path('/tmp/rail-source.geojson').read_bytes()
+          decoded=gzip.decompress(source) if source.startswith(b'\\x1f\\x8b') else source
+          Path('/tmp/rail-source-decoded.geojson').write_bytes(decoded)
+          print(f"Decoded official export: {len(decoded)} bytes; gzip={source.startswith(b'\\x1f\\x8b')}")
+          PY
           python -m json.tool /tmp/rail-source-decoded.geojson >/dev/null
           python - <<'PY'
           import json
