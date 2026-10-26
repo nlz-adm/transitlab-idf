@@ -99,10 +99,10 @@ function splitRepeatedRouteChains(lines){
 // fetch the authoritative GeoJSON export directly so a failed scheduled refresh does not
 // silently leave the map on the bundled network.
 const normalizeOfficialLine = value => {
- let line=String(value||'').toUpperCase().replace(/-/g,' ').replace(/\\s+/g,' ').trim();
+ let line=String(value||'').toUpperCase().replace(/-/g,' ').replace(/\s+/g,' ').trim();
  line=line.replace(/^TRAMWAY T/,'TRAM ').replace(/^TRAM T/,'TRAM ').replace(/^METRO M/,'METRO ');
- if(/^M\\d+$/.test(line))line='METRO '+line.slice(1);
- else if(/^T\\d+$/.test(line))line='TRAM '+line.slice(1);
+ if(/^M\d+$/.test(line))line='METRO '+line.slice(1);
+ else if(/^T\d+$/.test(line))line='TRAM '+line.slice(1);
  else if(/^LIGNE /.test(line))line='TRAIN '+line.slice(6);
  return line;
 };
