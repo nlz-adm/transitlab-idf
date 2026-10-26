@@ -15,6 +15,7 @@ on:
       - "tools/validate-iris-density.py"
       - "tools/test-iris-map-logic.cjs"
       - "tools/test-route-topology.cjs"
+      - "tools/test-route-rendering.mjs"
       - "tools/audit-route-overlaps.cjs"
       - "tools/test-route-overlap-audit.cjs"
       - "assets/network-data.json"
@@ -85,6 +86,8 @@ jobs:
           done
           cat /tmp/transitlab-head-http.log
           exit 1
+      - name: Test route rendering and mode-specific icons
+        run: node tools/test-route-rendering.mjs
       - name: Repeat benchmark current branch in Chromium
         run: |
           set -e
