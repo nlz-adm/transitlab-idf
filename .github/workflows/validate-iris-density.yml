@@ -72,3 +72,11 @@ jobs:
           exit 1
       - name: Smoke-test the IRIS map in Chromium
         run: node tools/test-iris-browser.mjs
+      - name: Upload IRIS browser screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iris-map-browser-screenshot
+          path: /tmp/iris-map-smoke.png
+          if-no-files-found: ignore
+          retention-days: 7
