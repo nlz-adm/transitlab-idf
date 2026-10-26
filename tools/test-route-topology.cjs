@@ -116,4 +116,29 @@ assert.equal(context.isRailVertexPinned('Metro A', [3, 0]), true,
 assert.equal(context.isRailVertexPinned('Unknown line', [1, 0]), false,
   'unknown lines keep the previous fallback behavior');
 
-console.log('Route topology tests passed: 7 junction/station anchoring cases.');
+
+const offsetMatch = source.match(/function offsetRailCoordinate\\(coord,name,zoom,spacing=5,neighbors=\\[\\]\\)\\{[\\s\\S]*?\\n\\}/);
+assert.ok(offsetMatch, 'map-app.js must expose the real shared-route offset helper');
+const offsetContext = {
+  sharedTrackEdges: new Map(),
+  railEdgeKey: (a,b) => String(a[0])+','+String(a[1])+'|'+String(b[0])+','+String(b[1]),
+  isRailVertexPinned: () => false,
+  railNormal: edge => edge.normal,
+  map: { project: ([lng,lat]) => ({x:lng,y:lat}), unproject: p => ({lng:p.x,lat:p.y}) },
+  L: { point: (x,y) => ({x,y}) }
+};
+vm.createContext(offsetContext);
+vm.runInContext(offsetMatch[0], offsetContext);
+const p0=[0,0],p1=[1,0],p2=[1,1];
+offsetContext.sharedTrackEdges.set(offsetContext.railEdgeKey(p0,p1), {normal:[0,1], offsets:new Map([['Metro A',1]])});
+offsetContext.sharedTrackEdges.set(offsetContext.railEdgeKey(p1,p2), {normal:[-1,0], offsets:new Map([['Metro A',1]])});
+const cornerOffset=offsetContext.offsetRailCoordinate(p1,'Metro A',12,5,[[p0,p1],[p1,p2]]);
+assert.ok(Math.abs(Math.hypot(cornerOffset[0]-1,cornerOffset[1])-5*Math.SQRT2)<1e-6,
+  'a 90-degree shared-route bend must use a bounded miter instead of averaging normals and shrinking the offset');
+offsetContext.railNormal = edge => edge.normal;
+offsetContext.sharedTrackEdges.set(offsetContext.railEdgeKey(p1,p2), {normal:[0,-1], offsets:new Map([['Metro A',1]])});
+const reversalOffset=offsetContext.offsetRailCoordinate(p1,'Metro A',12,5,[[p0,p1],[p1,p2]]);
+assert.ok(reversalOffset.every(Number.isFinite) && Math.hypot(reversalOffset[0]-1,reversalOffset[1])<=5.001,
+  'near-reversal geometry must fall back to a single edge offset rather than create a spike');
+
+console.log('Route topology tests passed: 7 junction/station anchoring cases plus offset-join regressions.');
