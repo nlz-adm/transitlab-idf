@@ -33,6 +33,13 @@ try {
   const loadedLayerCount = await page.locator('#layerGroups .line-row').count();
   await page.waitForFunction(() => [...document.querySelectorAll('#customModePicker img')].length === 4 && [...document.querySelectorAll('#customModePicker img')].every(img => img.complete && img.naturalWidth > 0), null, { timeout: 15000 });
 
+  // Force the map's explicit all-stations mode for this geometry test. In automatic
+  // mode, zoom 11 intentionally switches to logo-only rendering, so no station
+  // marker exists to measure even though the underlying route geometry is present.
+  await page.selectOption('#stationNamesMode', 'all');
+  await page.locator('#stationNamesMode').dispatchEvent('change');
+  await page.waitForTimeout(300);
+
   const expected = [
     ['Metro', 'mode-metro.png'],
     ['RER', 'rer.png'],
