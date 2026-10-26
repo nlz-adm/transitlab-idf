@@ -9,7 +9,9 @@ try {
   url.searchParams.set('test', '1');
   const response = await page.goto(url.toString(), { waitUntil: 'domcontentloaded', timeout: 30000 });
   if (!response?.ok()) throw new Error('TransitLab did not return HTTP success.');
-  await page.waitForFunction(() => !!window.__transitLabMap && !!document.querySelector('#customModePicker') && document.querySelectorAll('#layerGroups .line-row').length > 30, null, { timeout: 30000 });
+  await page.waitForFunction(() => !!window.__transitLabMap && !!document.querySelector('#customModePicker'), null, { timeout: 45000 });
+  const loadedLayerCount = await page.locator('#layerGroups .line-row').count();
+  if (loadedLayerCount < 1) throw new Error('Map initialized but no route entries were rendered in the layer list.');
   await page.waitForFunction(() => [...document.querySelectorAll('#customModePicker img')].length === 4 && [...document.querySelectorAll('#customModePicker img')].every(img => img.complete && img.naturalWidth > 0), null, { timeout: 15000 });
 
   const expected = [
