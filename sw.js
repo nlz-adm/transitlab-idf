@@ -1,4 +1,4 @@
-const CACHE_NAME = 'transitlab-idf-custom-transport-20261026-iris-label-v3';
+const CACHE_NAME = 'transitlab-idf-custom-transport-20261026-iris-label-v4';
 const STATIC_ASSETS = [
   './',
   './index.html',
