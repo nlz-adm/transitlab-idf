@@ -29,13 +29,13 @@ try {
 
   // Drive the map to a deterministic central-Paris viewport for stable IRIS coverage.
   await page.waitForFunction(() => !!window.__transitLabMap, null, { timeout: 10000 });
-  await page.evaluate(() => window.__transitLabMap.setView([48.8566, 2.3522], 12));
+  await page.evaluate(() => { window.__transitLabMap.setView([48.8566, 2.3522], 12); });
   await page.waitForTimeout(1500);
   const irisFeatures = await page.evaluate(() => document.querySelectorAll('.leaflet-population-density-pane canvas, .leaflet-population-density-pane path').length);
   if (irisFeatures < 1) throw new Error('Le moteur de rendu de la couche IRIS n’est pas présent dans son panneau Leaflet.');
 
   // Move to neighborhood scale explicitly and wait for the asynchronous IRIS refresh.
-  await page.evaluate(() => window.__transitLabMap.setView([48.8566, 2.3522], 15));
+  await page.evaluate(() => { window.__transitLabMap.setView([48.8566, 2.3522], 15); });
   try {
     await page.waitForFunction(() => document.querySelectorAll('.iris-name-label').length > 0, null, { timeout: 30000 });
   } catch {
@@ -43,7 +43,7 @@ try {
       labels: document.querySelectorAll('.iris-name-label').length,
       status: document.getElementById('saveStatus')?.textContent || '',
       zoom: window.__transitLabMap?.getZoom?.() ?? null,
-      center: window.__transitLabMap?.getCenter?.() ?? null,
+      center: (() => { const center = window.__transitLabMap?.getCenter?.(); return center ? [center.lat, center.lng] : null; })(),
       paneExists: !!document.querySelector('.leaflet-population-density-pane'),
       featurePaths: document.querySelectorAll('.leaflet-population-density-pane path, .leaflet-population-density-pane canvas').length,
       irisRequests: performance.getEntriesByType('resource').filter(entry => /population-iris/.test(entry.name)).map(entry => ({url: entry.name, durationMs: Math.round(entry.duration)})),
