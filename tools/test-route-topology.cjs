@@ -24,12 +24,12 @@ const differentlySegmented = [
 ];
 normalizeContext.normalizeSharedTrackSegmentation(differentlySegmented);
 assert.deepEqual(
- differentlySegmented[0].geometry.coordinates.map(c=>Number(c[0].toFixed(5))),
+ Array.from(differentlySegmented[0].geometry.coordinates, c=>Number(c[0].toFixed(5))),
  [2,2.002,2.006,2.008,2.01],
  'the longer route must be split at endpoints from the shorter route'
 );
 assert.deepEqual(
- differentlySegmented[1].geometry.coordinates.map(c=>Number(c[0].toFixed(5))),
+ Array.from(differentlySegmented[1].geometry.coordinates, c=>Number(c[0].toFixed(5))),
  [2.002,2.006,2.008],
  'existing vertices must be preserved'
 );
