@@ -13,7 +13,17 @@ assert.ok(builder, 'map-app.js must expose the real route-topology index builder
 assert.ok(predicate, 'map-app.js must expose the real junction-pinning helper');
 assert.ok(stationPinner, 'map-app.js must expose the real station anchoring helper');
 
-const normalizerMatch = source.match(/function normalizeSharedTrackSegmentation\(lines\)\{[\s\S]*?\n\}/);
+const splitterMatch = source.match(/function splitRepeatedRouteChains\(lines\)\{[\s\S]*?\n\}/);
+assert.ok(splitterMatch, 'map-app.js must split accidental route connectors at repeated vertices');
+const splitContext = {};
+vm.createContext(splitContext);
+vm.runInContext(splitterMatch[0], splitContext);
+const malformedBranch = [{properties:{line:'TRAM 6',mode:'Tramway'},geometry:{type:'LineString',coordinates:[[2.178798,48.785121],[2.171307,48.800716],[2.178798,48.785121],[2.176976,48.784057],[2.176848,48.783692]]}}];
+const splitBranch = splitContext.splitRepeatedRouteChains(malformedBranch);
+assert.equal(splitBranch.length, 2, 'a repeated interior vertex must split the accidental connector into independent branches');
+assert.deepEqual(Array.from(splitBranch[0].geometry.coordinates), [[2.178798,48.785121],[2.171307,48.800716]], 'the first branch must stop before the spurious return segment');
+assert.deepEqual(Array.from(splitBranch[1].geometry.coordinates), [[2.178798,48.785121],[2.176976,48.784057],[2.176848,48.783692]], 'the second branch must restart at the repeated junction');
+\nconst normalizerMatch = source.match(/function normalizeSharedTrackSegmentation\(lines\)\{[\s\S]*?\n\}/);
 assert.ok(normalizerMatch, 'map-app.js must normalize shared route segmentation before indexing');
 const normalizeContext = {};
 vm.createContext(normalizeContext);
