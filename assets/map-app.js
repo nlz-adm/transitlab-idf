@@ -20,7 +20,50 @@ for(const name of lineNames){const first=DATA.lines.find(x=>x.properties.line===
 const sharedTrackEdges=new Map(),sharedTrackVertices=new Map(),shiftedFeatureCache=new WeakMap();
 function railCoordKey(c){return Number(c[0]).toFixed(5)+','+Number(c[1]).toFixed(5)}
 function railEdgeKey(a,b){const ka=railCoordKey(a),kb=railCoordKey(b);return ka<kb?ka+'|'+kb:kb+'|'+ka}
-const buildSharedTrackIndex=lines=>{if(!window.Worker)return Promise.resolve(null);return new Promise(resolve=>{let worker;try{worker=new Worker(new URL('assets/line-index-worker.js',document.baseURI),{type:'module'})}catch{resolve(null);return}const done=value=>{worker.terminate();resolve(value)};worker.onmessage=event=>done(event.data);worker.onerror=()=>done(null);worker.postMessage({type:'indexSharedTracks',lines})})};
+function normalizeSharedTrackSegmentation(lines){
+ const gridStep=.0001,toleranceMeters=1.25,grid=new Map(),points=[];
+ const key=(x,y)=>Math.floor(x/gridStep)+','+Math.floor(y/gridStep);
+ for(const feature of lines||[]){
+  const geometry=feature.geometry;if(!geometry||!['LineString','MultiLineString'].includes(geometry.type))continue;
+  const chains=geometry.type==='MultiLineString'?geometry.coordinates:[geometry.coordinates];
+  for(const coords of chains||[])for(const coord of coords||[]){
+   if(!Array.isArray(coord)||coord.length<2)continue;
+   const point={coord:[Number(coord[0]),Number(coord[1])]};
+   if(!point.coord.every(Number.isFinite))continue;
+   points.push(point);const cell=key(point.coord[0],point.coord[1]);
+   if(!grid.has(cell))grid.set(cell,[]);grid.get(cell).push(point);
+  }
+ }
+ const metersPerDegree=111320;
+ for(const feature of lines||[]){
+  const geometry=feature.geometry;if(!geometry||!['LineString','MultiLineString'].includes(geometry.type))continue;
+  const chains=geometry.type==='MultiLineString'?geometry.coordinates:[geometry.coordinates];
+  const splitChains=(chains||[]).map(coords=>{
+   if(!Array.isArray(coords)||coords.length<2)return coords;
+   const output=[coords[0]];
+   for(let i=1;i<coords.length;i++){
+    const a=coords[i-1],b=coords[i],latScale=Math.cos(((a[1]+b[1])/2)*Math.PI/180);
+    const dx=(b[0]-a[0])*metersPerDegree*latScale,dy=(b[1]-a[1])*metersPerDegree,len2=dx*dx+dy*dy;
+    if(len2<1e-8){output.push(b);continue}
+    const minX=Math.floor(Math.min(a[0],b[0])/gridStep),maxX=Math.floor(Math.max(a[0],b[0])/gridStep);
+    const minY=Math.floor(Math.min(a[1],b[1])/gridStep),maxY=Math.floor(Math.max(a[1],b[1])/gridStep),candidates=new Map();
+    for(let gx=minX-1;gx<=maxX+1;gx++)for(let gy=minY-1;gy<=maxY+1;gy++)for(const point of grid.get(gx+','+gy)||[]){
+     const p=point.coord;if((p[0]===a[0]&&p[1]===a[1])||(p[0]===b[0]&&p[1]===b[1]))continue;
+     const px=(p[0]-a[0])*metersPerDegree*latScale,py=(p[1]-a[1])*metersPerDegree,t=(px*dx+py*dy)/len2;
+     if(t<=1e-6||t>=1-1e-6)continue;
+     const distance=Math.hypot(px-t*dx,py-t*dy);if(distance>toleranceMeters)continue;
+     const rounded=Number(t.toFixed(10));if(!candidates.has(rounded))candidates.set(rounded,p);
+    }
+    for(const [,point] of [...candidates].sort((u,v)=>u[0]-v[0]))output.push(point.slice());
+    output.push(b);
+   }
+   return output;
+  });
+  if(geometry.type==='MultiLineString')geometry.coordinates=splitChains;else geometry.coordinates=splitChains[0];
+ }
+ return lines;
+}
+normalizeSharedTrackSegmentation(DATA.lines);\nconst buildSharedTrackIndex=lines=>{if(!window.Worker)return Promise.resolve(null);return new Promise(resolve=>{let worker;try{worker=new Worker(new URL('assets/line-index-worker.js',document.baseURI),{type:'module'})}catch{resolve(null);return}const done=value=>{worker.terminate();resolve(value)};worker.onmessage=event=>done(event.data);worker.onerror=()=>done(null);worker.postMessage({type:'indexSharedTracks',lines})})};
 const sharedIndex=await buildSharedTrackIndex(DATA.lines);
 if(sharedIndex?.edges){for(const record of sharedIndex.edges){const edge={a:record.a,b:record.b,lines:new Set(record.lines),offsets:new Map(record.offsets)};sharedTrackEdges.set(railEdgeKey(edge.a,edge.b),edge);for(const coord of [edge.a,edge.b]){const vertexKey=railCoordKey(coord);if(!sharedTrackVertices.has(vertexKey))sharedTrackVertices.set(vertexKey,[]);sharedTrackVertices.get(vertexKey).push(edge)}}}else{for(const feature of DATA.lines){const name=feature.properties.line,coordinates=feature.geometry.coordinates;if(feature.geometry.type!=='LineString')continue;for(let i=1;i<coordinates.length;i++){const a=coordinates[i-1],b=coordinates[i],key=railEdgeKey(a,b);let edge=sharedTrackEdges.get(key);if(!edge){edge={a:a.slice(),b:b.slice(),lines:new Set(),offsets:new Map()};sharedTrackEdges.set(key,edge)}edge.lines.add(name)}}for(const [key,edge] of sharedTrackEdges){if(edge.lines.size<2){sharedTrackEdges.delete(key);continue}const names=[...edge.lines].sort((a,b)=>a.localeCompare(b,'fr',{numeric:true}));names.forEach((name,index)=>edge.offsets.set(name,index-(names.length-1)/2));for(const coord of [edge.a,edge.b]){const vertexKey=railCoordKey(coord);if(!sharedTrackVertices.has(vertexKey))sharedTrackVertices.set(vertexKey,[]);sharedTrackVertices.get(vertexKey).push(edge)}}}
 function buildRailUnsharedVertices(lines,edges,edgeKey,coordKey){
