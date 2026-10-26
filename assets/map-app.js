@@ -95,6 +95,17 @@ function splitRepeatedRouteChains(lines){
  }
  return output;
 }
+// Prefer the official IDFM rail geometry when the checked-in generated dataset is available.
+// The existing bundled network remains a safe fallback if the official refresh has not run yet.
+try {
+ const officialRail=await fetchJson(new URL('assets/official-rail-traces.json?v=idfm-rail-v1',document.baseURI),{cache:'no-store'});
+ const officialFeatures=(officialRail?.features||[]).filter(feature=>feature?.geometry&&['LineString','MultiLineString'].includes(feature.geometry.type)&&feature.properties?.line);
+ const officialLineNames=new Set(officialFeatures.map(feature=>feature.properties.line));
+ if(officialFeatures.length>=500&&officialLineNames.size>=20&&[...officialLineNames].some(name=>/^RER C$/i.test(name))&&[...officialLineNames].some(name=>/^TRAM 6$/i.test(name))){
+  DATA.lines=officialFeatures;
+  console.info('TransitLab: tracés ferrés officiels IDFM chargés',officialFeatures.length,'tronçons',officialLineNames.size,'lignes');
+ } else console.warn('TransitLab: export officiel incomplet ou libellés non reconnus, conservation du réseau embarqué');
+} catch(error) { console.warn('TransitLab: tracés officiels IDFM indisponibles, conservation du réseau embarqué',error?.message||error); }
 DATA.lines=splitRepeatedRouteChains(DATA.lines);
 normalizeSharedTrackSegmentation(DATA.lines);
 const buildSharedTrackIndex=lines=>{if(!window.Worker)return Promise.resolve(null);return new Promise(resolve=>{let worker;try{worker=new Worker(new URL('assets/line-index-worker.js',document.baseURI),{type:'module'})}catch{resolve(null);return}const done=value=>{worker.terminate();resolve(value)};worker.onmessage=event=>done(event.data);worker.onerror=()=>done(null);worker.postMessage({type:'indexSharedTracks',lines})})};
