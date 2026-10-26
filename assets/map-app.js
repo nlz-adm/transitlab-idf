@@ -95,17 +95,47 @@ function splitRepeatedRouteChains(lines){
  }
  return output;
 }
-// Prefer the official IDFM rail geometry when the checked-in generated dataset is available.
-// The existing bundled network remains a safe fallback if the official refresh has not run yet.
+// Prefer official IDFM geometry. Try the generated local asset first; if it is missing,
+// fetch the authoritative GeoJSON export directly so a failed scheduled refresh does not
+// silently leave the map on the bundled network.
+const normalizeOfficialLine = value => {
+ let line=String(value||'').toUpperCase().replace(/-/g,' ').replace(/\\s+/g,' ').trim();
+ line=line.replace(/^TRAMWAY T/,'TRAM ').replace(/^TRAM T/,'TRAM ').replace(/^METRO M/,'METRO ');
+ if(/^M\\d+$/.test(line))line='METRO '+line.slice(1);
+ else if(/^T\\d+$/.test(line))line='TRAM '+line.slice(1);
+ else if(/^LIGNE /.test(line))line='TRAIN '+line.slice(6);
+ return line;
+};
+const normalizeOfficialFeature = feature => {
+ const p=feature?.properties||{}, raw=String(p.mode||p.reseau||'').toUpperCase();
+ const line=normalizeOfficialLine(p.res_com||p.nomlong||p.nom_long||p.route_long_name||p.route_short_name||p.line||p.libelle||p.nom||'');
+ if(!line||!feature?.geometry||!['LineString','MultiLineString'].includes(feature.geometry.type))return null;
+ let mode='Transilien';
+ if(line.startsWith('METRO ')||raw.includes('METRO'))mode='Metro';
+ else if(line.startsWith('RER ')||raw.includes('RER'))mode='RER';
+ else if(line.startsWith('TRAM ')||raw.includes('TRAM'))mode='Tramway';
+ else if(line==='C1'||raw.includes('CABLE')||raw.includes('NAVETTE'))mode='Navette';
+ let color=String(p.colourweb_hexa||p.couleur||p.color||p.route_color||'65758b').replace(/^#/,'').toLowerCase();
+ if(!/^[0-9a-f]{6}$/.test(color))color='65758b';
+ return {type:'Feature',properties:{...p,line,mode,color,source:'Île-de-France Mobilités'},geometry:feature.geometry};
+};
 try {
- const officialResponse=await fetch(new URL('assets/official-rail-traces.json?v=idfm-rail-v2',document.baseURI),{cache:'no-store'}); if(!officialResponse.ok)throw new Error('HTTP '+officialResponse.status); const officialRail=await officialResponse.json();
- const officialFeatures=(officialRail?.features||[]).filter(feature=>feature?.geometry&&['LineString','MultiLineString'].includes(feature.geometry.type)&&feature.properties?.line);
+ let officialRail;
+ const localResponse=await fetch(new URL('assets/official-rail-traces.json?v=idfm-rail-v3',document.baseURI),{cache:'no-store'});
+ if(localResponse.ok)officialRail=await localResponse.json();
+ else {
+  console.warn('TransitLab: fichier officiel local absent (HTTP '+localResponse.status+'); tentative sur la source IDFM');
+  const sourceResponse=await fetch('https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/traces-du-reseau-ferre-idf/exports/geojson',{cache:'no-store'});
+  if(!sourceResponse.ok)throw new Error('Source IDFM HTTP '+sourceResponse.status);
+  officialRail=await sourceResponse.json();
+ }
+ const officialFeatures=(officialRail?.features||[]).map(normalizeOfficialFeature).filter(Boolean);
  const officialLineNames=new Set(officialFeatures.map(feature=>feature.properties.line));
- if(officialFeatures.length>=500&&officialLineNames.size>=20&&[...officialLineNames].some(name=>/^RER C$/i.test(name))&&[...officialLineNames].some(name=>/^TRAM 6$/i.test(name))){
+ if(officialFeatures.length>=500&&officialLineNames.size>=20&&officialLineNames.has('RER C')&&officialLineNames.has('TRAM 6')){
   DATA.lines=officialFeatures;
   console.info('TransitLab: tracés ferrés officiels IDFM chargés',officialFeatures.length,'tronçons',officialLineNames.size,'lignes');
- } else console.warn('TransitLab: export officiel incomplet ou libellés non reconnus, conservation du réseau embarqué');
-} catch(error) { console.warn('TransitLab: tracés officiels IDFM indisponibles, conservation du réseau embarqué',error?.message||error); }
+ } else throw new Error('Export incomplet: '+officialFeatures.length+' tronçons / '+officialLineNames.size+' lignes');
+} catch(error) { console.error('TransitLab: import officiel IDFM impossible; réseau embarqué conservé',error?.message||error); }
 DATA.lines=splitRepeatedRouteChains(DATA.lines);
 normalizeSharedTrackSegmentation(DATA.lines);
 const buildSharedTrackIndex=lines=>{if(!window.Worker)return Promise.resolve(null);return new Promise(resolve=>{let worker;try{worker=new Worker(new URL('assets/line-index-worker.js',document.baseURI),{type:'module'})}catch{resolve(null);return}const done=value=>{worker.terminate();resolve(value)};worker.onmessage=event=>done(event.data);worker.onerror=()=>done(null);worker.postMessage({type:'indexSharedTracks',lines})})};
