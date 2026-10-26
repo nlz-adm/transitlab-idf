@@ -25,6 +25,7 @@ on:
       - "carte-interactive-ile-de-france.html"
       - "sw.js"
       - "tools/validate-iris-density.py"
+      - "tools/test-iris-map-logic.cjs"
       - ".github/workflows/validate-iris-density.yml"
   workflow_dispatch:
 
