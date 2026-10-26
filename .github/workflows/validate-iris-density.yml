@@ -71,8 +71,13 @@ jobs:
           done
           cat /tmp/transitlab-head-http.log
           exit 1
-      - name: Benchmark current branch in Chromium
-        run: IRIS_BENCHMARK_LABEL=head IRIS_SCREENSHOT_PATH=/tmp/iris-map-smoke-head.png node tools/test-iris-browser.mjs
+      - name: Repeat benchmark current branch in Chromium
+        run: |
+          set -e
+          for i in 1 2 3 4 5; do
+            echo "HEAD_BENCHMARK_RUN=$i"
+            IRIS_BENCHMARK_LABEL=head-run-$i IRIS_SCREENSHOT_PATH=/tmp/iris-map-smoke-head.png node tools/test-iris-browser.mjs | tee "/tmp/iris-head-$i.json"
+          done
       - name: Prepare baseline from main
         run: |
           git fetch origin main
@@ -97,13 +102,40 @@ jobs:
           done
           cat /tmp/transitlab-base-http.log
           exit 1
-      - name: Benchmark baseline main in Chromium
+      - name: Repeat benchmark baseline main in Chromium
         env:
           TRANSITLAB_TEST_URL: http://127.0.0.1:4174/carte-interactive-ile-de-france.html
           IRIS_LABEL_MAX_MS: "0"
-          IRIS_BENCHMARK_LABEL: main-baseline
           IRIS_SCREENSHOT_PATH: /tmp/iris-map-smoke-base.png
-        run: node tools/test-iris-browser.mjs
+        run: |
+          set -e
+          for i in 1 2 3 4 5; do
+            echo "BASELINE_BENCHMARK_RUN=$i"
+            IRIS_BENCHMARK_LABEL=main-run-$i node tools/test-iris-browser.mjs | tee "/tmp/iris-main-$i.json"
+          done
+      - name: Summarize repeated benchmark measurements
+        run: |
+          python - <<'PY'
+          import json, statistics
+          from pathlib import Path
+          def values(prefix):
+              rows = [json.loads(Path(f'/tmp/{prefix}-{i}.json').read_text()) for i in range(1, 6)]
+              nums = [row['zoomToFirstNeighborhoodLabelMs'] for row in rows]
+              print(json.dumps({
+                  'benchmark': prefix,
+                  'runsMs': nums,
+                  'medianMs': statistics.median(nums),
+                  'minMs': min(nums),
+                  'maxMs': max(nums),
+                  'labels': [row['neighborhoodLabels'] for row in rows],
+                  'errors': [row['consolePageErrors'] for row in rows],
+              }))
+              return statistics.median(nums)
+          main = values('iris-main')
+          head = values('iris-head')
+          delta = round((head-main)/main*100, 1) if main else None
+          print(json.dumps({'medianChangePercentVsMain': delta, 'interpretation': 'lower is faster; negative means branch is faster'}))
+          PY
       - name: Upload IRIS browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
