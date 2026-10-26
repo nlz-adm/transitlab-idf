@@ -60,6 +60,7 @@ try {
   await densityToggle.uncheck();
   await page.locator('#communesBoundaryToggle').check();
   await page.waitForTimeout(500);
+  await page.screenshot({ path: '/tmp/iris-map-smoke.png', fullPage: false });
 
   if (errors.length) throw new Error('Erreurs JavaScript navigateur : ' + errors.join(' | '));
   console.log(JSON.stringify({
