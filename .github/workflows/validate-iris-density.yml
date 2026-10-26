@@ -1,0 +1,146 @@
+name: Validate IRIS density data
+
+on:
+  push:
+    branches:
+      - "perf/iris-label-centers"
+    paths:
+      - "assets/population-iris-index.json"
+      - "assets/population-iris/**"
+      - "assets/map-app.js"
+      - "assets/map-boot.js"
+      - "assets/data-catalog.json"
+      - "carte-interactive-ile-de-france.html"
+      - "sw.js"
+      - "tools/validate-iris-density.py"
+      - "tools/test-iris-map-logic.cjs"
+      - "tools/test-iris-browser.mjs"
+      - ".github/workflows/validate-iris-density.yml"
+  pull_request:
+    paths:
+      - "assets/population-iris-index.json"
+      - "assets/population-iris/**"
+      - "assets/map-app.js"
+      - "assets/map-boot.js"
+      - "assets/data-catalog.json"
+      - "carte-interactive-ile-de-france.html"
+      - "sw.js"
+      - "tools/validate-iris-density.py"
+      - "tools/test-iris-map-logic.cjs"
+      - "tools/test-iris-browser.mjs"
+      - ".github/workflows/validate-iris-density.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-iris:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Validate compressed IRIS data
+        run: python tools/validate-iris-density.py
+      - name: Check JavaScript syntax
+        run: node --check assets/map-app.js
+      - name: Test IRIS density and viewport helpers
+        run: node tools/test-iris-map-logic.cjs
+      - name: Check JSON data catalog and IRIS index
+        run: |
+          python -c "import json; json.load(open('assets/data-catalog.json', encoding='utf-8')); json.load(open('assets/population-iris-index.json', encoding='utf-8'))"
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Start current branch static server
+        run: |
+          python -m http.server 4173 --bind 127.0.0.1 > /tmp/transitlab-head-http.log 2>&1 &
+          echo $! > /tmp/transitlab-head-http.pid
+          for i in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:4173/carte-interactive-ile-de-france.html > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/transitlab-head-http.log
+          exit 1
+      - name: Repeat benchmark current branch in Chromium
+        run: |
+          set -e
+          for i in 1 2 3 4 5; do
+            echo "HEAD_BENCHMARK_RUN=$i"
+            IRIS_BENCHMARK_LABEL=head-run-$i IRIS_SCREENSHOT_PATH=/tmp/iris-map-smoke-head.png node tools/test-iris-browser.mjs | tee "/tmp/iris-head-$i.json"
+          done
+      - name: Prepare baseline from main
+        run: |
+          git fetch origin main
+          git worktree add --detach /tmp/transitlab-baseline origin/main
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('/tmp/transitlab-baseline/assets/map-app.js')
+          source = path.read_text(encoding='utf-8')
+          marker = "const map=L.map('map',{zoomControl:true,preferCanvas:true,renderer:L.canvas({padding:.2})}).setView([48.79,2.43],9);"
+          if source.count(marker) != 1:
+              raise SystemExit('Impossible d’injecter le hook de test dans le point d’initialisation Leaflet de main.')
+          path.write_text(source.replace(marker, marker + "if(new URLSearchParams(location.search).has('test'))window.__transitLabMap=map;", 1), encoding='utf-8')
+          PY
+      - name: Start baseline static server
+        run: |
+          cd /tmp/transitlab-baseline
+          python -m http.server 4174 --bind 127.0.0.1 > /tmp/transitlab-base-http.log 2>&1 &
+          echo $! > /tmp/transitlab-base-http.pid
+          for i in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:4174/carte-interactive-ile-de-france.html > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/transitlab-base-http.log
+          exit 1
+      - name: Repeat benchmark baseline main in Chromium
+        env:
+          TRANSITLAB_TEST_URL: http://127.0.0.1:4174/carte-interactive-ile-de-france.html
+          IRIS_LABEL_MAX_MS: "0"
+          IRIS_SCREENSHOT_PATH: /tmp/iris-map-smoke-base.png
+        run: |
+          set -e
+          for i in 1 2 3 4 5; do
+            echo "BASELINE_BENCHMARK_RUN=$i"
+            IRIS_BENCHMARK_LABEL=main-run-$i node tools/test-iris-browser.mjs | tee "/tmp/iris-main-$i.json"
+          done
+      - name: Summarize repeated benchmark measurements
+        run: |
+          python - <<'PY'
+          import json, statistics
+          from pathlib import Path
+          def values(prefix):
+              rows = [json.loads(Path(f'/tmp/{prefix}-{i}.json').read_text()) for i in range(1, 6)]
+              nums = [row['zoomToFirstNeighborhoodLabelMs'] for row in rows]
+              print(json.dumps({
+                  'benchmark': prefix,
+                  'runsMs': nums,
+                  'medianMs': statistics.median(nums),
+                  'minMs': min(nums),
+                  'maxMs': max(nums),
+                  'labels': [row['neighborhoodLabels'] for row in rows],
+                  'errors': [row['consolePageErrors'] for row in rows],
+              }))
+              return statistics.median(nums)
+          main = values('iris-main')
+          head = values('iris-head')
+          delta = round((head-main)/main*100, 1) if main else None
+          print(json.dumps({'medianChangePercentVsMain': delta, 'interpretation': 'lower is faster; negative means branch is faster'}))
+          PY
+      - name: Upload IRIS browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iris-map-browser-screenshots
+          path: /tmp/iris-map-smoke-*.png
+          if-no-files-found: error
+          retention-days: 7
