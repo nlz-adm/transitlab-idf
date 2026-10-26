@@ -49,11 +49,18 @@ def main() -> None:
 
     total_features = 0
     matched_population = 0
+    total_compressed_bytes = 0
     seen_codes: set[str] = set()
+    seen_departments: set[str] = set()
     problems: list[str] = []
 
     for entry in departments:
         department = str(entry.get("department", ""))
+        if department in seen_departments:
+            problems.append(f"index: département dupliqué ({department})")
+        seen_departments.add(department)
+        if not valid_bbox(entry.get("bbox")):
+            problems.append(f"{department or '?'}: bbox départementale absente ou invalide")
         relative_path = entry.get("url")
         if not department or not isinstance(relative_path, str):
             problems.append("entrée de département invalide")
@@ -68,6 +75,7 @@ def main() -> None:
             problems.append(f"{department}: fichier absent ou illisible ({error})")
             continue
 
+        total_compressed_bytes += compressed_size
         if compressed_size != entry.get("bytesCompressed"):
             problems.append(
                 f"{department}: taille compressée {compressed_size}, "
@@ -105,16 +113,30 @@ def main() -> None:
             population = props.get("population")
             density = props.get("density")
             if population is not None:
-                if not isinstance(population, (int, float)) or population < 0:
+                if (
+                    isinstance(population, bool)
+                    or not isinstance(population, (int, float))
+                    or not math.isfinite(population)
+                    or population < 0
+                ):
                     problems.append(f"{label}: population invalide")
                 else:
                     matched_population += 1
             if density is not None and (
-                not isinstance(density, (int, float)) or density < 0
+                isinstance(density, bool)
+                or not isinstance(density, (int, float))
+                or not math.isfinite(density)
+                or density < 0
             ):
                 problems.append(f"{label}: densité invalide")
             if population is None and density is not None:
                 problems.append(f"{label}: densité renseignée sans population")
+
+    if total_compressed_bytes != index.get("bytesCompressed"):
+        problems.append(
+            f"total: {total_compressed_bytes} octets compressés, "
+            f"index {index.get('bytesCompressed')}"
+        )
 
     expected_features = index.get("features")
     expected_matched = index.get("matchedPopulation")
