@@ -36,7 +36,17 @@ try {
   // Zoom to the neighborhood-label threshold (15), then verify the label layer
   // has at least one visible candidate in the initial Île-de-France viewport.
   for (let i = 0; i < 3; i++) await page.locator('.leaflet-control-zoom-in').click();
-  await page.waitForFunction(() => document.querySelectorAll('.iris-name-label').length > 0, null, { timeout: 30000 });
+  await page.waitForTimeout(3000);
+  const labelDiagnostics = await page.evaluate(() => ({
+    labels: document.querySelectorAll('.iris-name-label').length,
+    status: document.getElementById('saveStatus')?.textContent || '',
+    zoom: window.__transitLabMap?.getZoom?.() ?? null,
+    paneExists: !!document.querySelector('.leaflet-population-density-pane'),
+    featurePaths: document.querySelectorAll('.leaflet-population-density-pane path, .leaflet-population-density-pane canvas').length,
+  }));
+  if (!labelDiagnostics.labels) {
+    throw new Error('Aucune étiquette IRIS au zoom de quartier. Diagnostic navigateur : ' + JSON.stringify(labelDiagnostics));
+  }
 
   await densityToggle.uncheck();
   await page.locator('#communesBoundaryToggle').check();
