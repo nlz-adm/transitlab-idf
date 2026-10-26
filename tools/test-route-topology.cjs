@@ -13,6 +13,36 @@ assert.ok(builder, 'map-app.js must expose the real route-topology index builder
 assert.ok(predicate, 'map-app.js must expose the real junction-pinning helper');
 assert.ok(stationPinner, 'map-app.js must expose the real station anchoring helper');
 
+const splitterMatch = source.match(/function splitRepeatedRouteChains\(lines\)\{[\s\S]*?\n\}/);
+assert.ok(splitterMatch, 'map-app.js must split accidental route connectors at repeated vertices');
+const splitContext = {};
+vm.createContext(splitContext);
+vm.runInContext(splitterMatch[0], splitContext);
+const malformedBranch = [{properties:{line:'TRAM 6',mode:'Tramway'},geometry:{type:'LineString',coordinates:[[2.178798,48.785121],[2.171307,48.800716],[2.178798,48.785121],[2.176976,48.784057],[2.176848,48.783692]]}}];
+const splitBranch = splitContext.splitRepeatedRouteChains(malformedBranch);
+assert.equal(splitBranch.length, 1, 'a repeated interior vertex at the start of a concatenated branch must be repaired as one continuous route');
+assert.deepEqual(Array.from(splitBranch[0].geometry.coordinates), [[2.171307,48.800716],[2.178798,48.785121],[2.176976,48.784057],[2.176848,48.783692]], 'the route must reverse the first branch at the repeated junction and continue without a long artificial return segment');
+const realNetworkForRepeatTest = JSON.parse(fs.readFileSync('assets/network-data.json','utf8'));
+const repairedRealNetwork = splitContext.splitRepeatedRouteChains(realNetworkForRepeatTest.lines);
+const repeatKey = coord => Number(coord[0]).toFixed(9)+','+Number(coord[1]).toFixed(9);
+let remainingInteriorRepeats=0;
+for(const feature of repairedRealNetwork){
+ const coords=feature.geometry?.coordinates||[],seen=new Set();
+ for(let i=0;i<coords.length;i++){const key=repeatKey(coords[i]);if(seen.has(key)&&i<coords.length-1)remainingInteriorRepeats++;seen.add(key)}
+}
+assert.equal(remainingInteriorRepeats, 0, 'repaired real route geometry must not contain repeated interior vertices that create artificial return segments');
+assert.ok(repairedRealNetwork.length >= realNetworkForRepeatTest.lines.length, 'route repair must preserve all branches as line features');
+
+const networkForSplitTest = JSON.parse(fs.readFileSync('assets/network-data.json','utf8'));
+const splitRealNetwork = splitContext.splitRepeatedRouteChains(networkForSplitTest.lines);
+const coordKeyForSplit = c => Number(c[0]).toFixed(9)+','+Number(c[1]).toFixed(9);
+let interiorRepeatsAfterSplit=0;
+for(const feature of splitRealNetwork){
+ const coords=feature.geometry?.coordinates||[],seen=new Set();
+ for(let i=0;i<coords.length;i++){const key=coordKeyForSplit(coords[i]);if(seen.has(key)&&i<coords.length-1)interiorRepeatsAfterSplit++;seen.add(key)}
+}
+assert.equal(interiorRepeatsAfterSplit, 0, 'the real network must contain no accidental mid-chain returns after route-chain repair');
+assert.ok(splitRealNetwork.length >= networkForSplitTest.lines.length, 'route-chain repair must preserve all route geometry as valid line features');
 const normalizerMatch = source.match(/function normalizeSharedTrackSegmentation\(lines\)\{[\s\S]*?\n\}/);
 assert.ok(normalizerMatch, 'map-app.js must normalize shared route segmentation before indexing');
 const normalizeContext = {};
@@ -116,4 +146,47 @@ assert.equal(context.isRailVertexPinned('Metro A', [3, 0]), true,
 assert.equal(context.isRailVertexPinned('Unknown line', [1, 0]), false,
   'unknown lines keep the previous fallback behavior');
 
-console.log('Route topology tests passed: 7 junction/station anchoring cases.');
+
+const offsetMatch = source.match(/function offsetRailCoordinate[\s\S]*?\n\}/);
+assert.ok(offsetMatch, 'map-app.js must expose the real shared-route offset helper');
+const offsetContext = {
+  sharedTrackEdges: new Map(),
+  railEdgeKey: (a,b) => String(a[0])+','+String(a[1])+'|'+String(b[0])+','+String(b[1]),
+  isRailVertexPinned: () => false,
+  railNormal: edge => edge.normal,
+  map: { project: ([lat,lng]) => ({x:lng,y:lat}), unproject: p => ({lng:p.x,lat:p.y}) },
+  L: { point: (x,y) => ({x,y}) }
+};
+vm.createContext(offsetContext);
+vm.runInContext(offsetMatch[0], offsetContext);
+const p0=[0,0],p1=[1,0],p2=[1,1];
+offsetContext.sharedTrackEdges.set(offsetContext.railEdgeKey(p0,p1), {normal:[0,1], offsets:new Map([['Metro A',1]])});
+offsetContext.sharedTrackEdges.set(offsetContext.railEdgeKey(p1,p2), {normal:[-1,0], offsets:new Map([['Metro A',1]])});
+const cornerOffset=offsetContext.offsetRailCoordinate(p1,'Metro A',12,5,[[p0,p1],[p1,p2]]);
+assert.ok(Math.abs(Math.hypot(cornerOffset[0]-1,cornerOffset[1])-5*Math.SQRT2)<1e-6,
+  'a 90-degree shared-route bend must use a bounded miter instead of averaging normals and shrinking the offset');
+offsetContext.railNormal = edge => edge.normal;
+offsetContext.sharedTrackEdges.set(offsetContext.railEdgeKey(p1,p2), {normal:[0,-1], offsets:new Map([['Metro A',1]])});
+const reversalOffset=offsetContext.offsetRailCoordinate(p1,'Metro A',12,5,[[p0,p1],[p1,p2]]);
+assert.ok(reversalOffset.every(Number.isFinite) && Math.hypot(reversalOffset[0]-1,reversalOffset[1])<=5.001,
+  'near-reversal geometry must fall back to a single edge offset rather than create a spike');
+
+
+const alignedMatch = source.match(/function alignedStationCoord\(name,coord,zoom\)\{[\s\S]*?\n\}/);
+assert.ok(alignedMatch, 'map-app.js must expose the station-to-rendered-route alignment helper');
+const alignedContext = {
+ stationPlacementsByLineCoord: new Map([['Metro A|0.50000,0.00000',{coord:[0.5,0],segment:[[0,0],[1,0]]}]]),
+ stationCoordKey: (lng,lat)=>[Number(lng).toFixed(5),Number(lat).toFixed(5)].join(','),
+ offsetRailStation: (name,coord)=>coord.slice(),
+ offsetRailCoordinate: (coord)=>[coord[0],coord[1]+0.01],
+ map:{project:([lat,lng])=>({x:lng,y:lat}),unproject:p=>({lng:p.x,lat:p.y})},
+ L:{point:(x,y)=>({x,y})}
+};
+vm.createContext(alignedContext);
+vm.runInContext(alignedMatch[0],alignedContext);
+const stationAtLowZoom=alignedContext.alignedStationCoord('Metro A',[0.5,0],11);
+const stationAtHighZoom=alignedContext.alignedStationCoord('Metro A',[0.5,0],13);
+assert.deepEqual(Array.from(stationAtLowZoom),[0.5,0],'low-zoom station positions must remain on the base route');
+assert.ok(Math.abs(stationAtHighZoom[0]-0.5)<1e-9&&Math.abs(stationAtHighZoom[1]-0.01)<1e-9,'high-zoom station markers must project onto the actual offset segment');
+
+console.log('Route topology tests passed: repeated-vertex repair, junction/station anchoring, and offset-join regressions.');

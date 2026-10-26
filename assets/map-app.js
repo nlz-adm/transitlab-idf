@@ -63,6 +63,39 @@ function normalizeSharedTrackSegmentation(lines){
  }
  return lines;
 }
+function splitRepeatedRouteChains(lines){
+ const output=[];
+ const coordKey=coord=>Number(coord[0]).toFixed(9)+','+Number(coord[1]).toFixed(9);
+ const repairChain=(feature,initial)=>{
+  let coords=initial.map(coord=>coord.slice()),guard=0;
+  while(coords.length>=2&&guard++<initial.length+2){
+   const seen=new Map();let repeat=null;
+   for(let i=0;i<coords.length;i++){
+    const key=coordKey(coords[i]);
+    if(seen.has(key)&&i<coords.length-1){repeat={start:seen.get(key),end:i};break}
+    if(!seen.has(key))seen.set(key,i);
+   }
+   if(!repeat)break;
+   const {start,end}=repeat;
+   // Keep any prefix before the repeated junction as its own branch. The
+   // repeated section is reversed and joined to the suffix, avoiding the
+   // long artificial "return" segment produced by concatenating route pieces
+   // whose directions disagree.
+   const prefix=coords.slice(0,start+1);
+   if(prefix.length>=2)output.push({...feature,geometry:{type:'LineString',coordinates:prefix}});
+   coords=coords.slice(start,end).reverse().concat(coords.slice(end+1));
+  }
+  if(coords.length>=2)output.push({...feature,geometry:{type:'LineString',coordinates:coords}});
+ };
+ for(const feature of lines||[]){
+  const geometry=feature.geometry;
+  if(!geometry||!['LineString','MultiLineString'].includes(geometry.type)){output.push(feature);continue}
+  const chains=geometry.type==='MultiLineString'?geometry.coordinates:[geometry.coordinates];
+  for(const coords of chains||[])if(Array.isArray(coords)&&coords.length>=2)repairChain(feature,coords);
+ }
+ return output;
+}
+DATA.lines=splitRepeatedRouteChains(DATA.lines);
 normalizeSharedTrackSegmentation(DATA.lines);
 const buildSharedTrackIndex=lines=>{if(!window.Worker)return Promise.resolve(null);return new Promise(resolve=>{let worker;try{worker=new Worker(new URL('assets/line-index-worker.js',document.baseURI),{type:'module'})}catch{resolve(null);return}const done=value=>{worker.terminate();resolve(value)};worker.onmessage=event=>done(event.data);worker.onerror=()=>done(null);worker.postMessage({type:'indexSharedTracks',lines})})};
 const sharedIndex=await buildSharedTrackIndex(DATA.lines);
@@ -100,7 +133,28 @@ function pinRailStationVertices(stations,placements,pinned,stationKey,coordKey){
  }
 }
 function railNormal(edge,zoom){const a=map.project([edge.a[1],edge.a[0]],zoom),b=map.project([edge.b[1],edge.b[0]],zoom),dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy)||1;return[-dy/length,dx/length]}
-function offsetRailCoordinate(coord,name,zoom,spacing=5,neighbors=[]){if(isRailVertexPinned(name,coord))return coord.slice();let dx=0,dy=0,count=0;for(const pair of neighbors){const edge=sharedTrackEdges.get(railEdgeKey(pair[0],pair[1]));if(!edge||!edge.offsets.has(name))continue;const normal=railNormal(edge,zoom),amount=edge.offsets.get(name)*spacing;dx+=normal[0]*amount;dy+=normal[1]*amount;count++}if(!count)return coord.slice();const point=map.project([coord[1],coord[0]],zoom);const shifted=map.unproject(L.point(point.x+dx/count,point.y+dy/count),zoom);return[shifted.lng,shifted.lat]}
+function offsetRailCoordinate(coord,name,zoom,spacing=5,neighbors=[]){
+ if(isRailVertexPinned(name,coord))return coord.slice();
+ const normals=[];
+ for(const pair of neighbors){
+  const edge=sharedTrackEdges.get(railEdgeKey(pair[0],pair[1]));
+  if(!edge||!edge.offsets.has(name))continue;
+  const normal=railNormal(edge,zoom),amount=edge.offsets.get(name)*spacing;
+  normals.push([normal[0]*amount,normal[1]*amount,normal[0],normal[1],amount]);
+ }
+ if(!normals.length)return coord.slice();
+ let dx=0,dy=0;
+ if(normals.length===1){dx=normals[0][0];dy=normals[0][1]}
+ else{
+  const n0=normals[0],n1=normals[1],sx=n0[2]+n1[2],sy=n0[3]+n1[3],sumLength=Math.hypot(sx,sy);
+  const dot=Math.max(.25,Math.abs((sx/(sumLength||1))*n0[2]+(sy/(sumLength||1))*n0[3]));
+  const miter=Math.min(2.5,1/dot),direction=(n0[4]+n1[4])<0?-1:1;
+  if(sumLength<1e-5||n0[4]*n1[4]<0){dx=n0[0];dy=n0[1]}
+  else{dx=sx/sumLength*Math.abs((n0[4]+n1[4])/2)*miter*direction;dy=sy/sumLength*Math.abs((n0[4]+n1[4])/2)*miter*direction}
+ }
+ const point=map.project([coord[1],coord[0]],zoom),shifted=map.unproject(L.point(point.x+dx,point.y+dy),zoom);
+ return[shifted.lng,shifted.lat]
+}
 function offsetRailChain(coords,name,zoom,spacing=5){return coords.map((coord,index)=>{const neighbors=[];if(index>0)neighbors.push([coords[index-1],coord]);if(index+1<coords.length)neighbors.push([coord,coords[index+1]]);return offsetRailCoordinate(coord,name,zoom,spacing,neighbors)})}
 function offsetRailFeature(feature,name,zoom,spacing=5){let cache=shiftedFeatureCache.get(feature);if(!cache){cache=new Map();shiftedFeatureCache.set(feature,cache)}const cacheKey=name+'|'+zoom.toFixed(2)+'|'+spacing;if(cache.has(cacheKey)){const cached=cache.get(cacheKey);cache.delete(cacheKey);cache.set(cacheKey,cached);return cached}const geometry=feature.geometry,coordinates=geometry.type==='MultiLineString'?geometry.coordinates.map(part=>offsetRailChain(part,name,zoom,spacing)):offsetRailChain(geometry.coordinates,name,zoom,spacing),shifted={...feature,geometry:{...geometry,coordinates}};cache.set(cacheKey,shifted);while(cache.size>2)cache.delete(cache.keys().next().value);return shifted}
 function offsetRailPointOnSegment(name,coord,a,b,zoom,spacing=5){return offsetRailCoordinate(coord,name,zoom,spacing,[[a,b]])}
@@ -174,7 +228,19 @@ function customViewportStops(line,stops,zoom,editing){if(editing)return stops;if
 function projectStationPoint(point,segments){let best=null,bestSegment=null,bestDistance=Infinity;for(const segment of segments||[]){const a=segment[0],b=segment[1],latScale=Math.cos(point[1]*Math.PI/180),ax=a[0]*latScale,ay=a[1],bx=b[0]*latScale,by=b[1],px=point[0]*latScale,py=point[1],dx=bx-ax,dy=by-ay,t=Math.max(0,Math.min(1,(dx*dx+dy*dy)?((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy):0)),candidate=[(ax+dx*t)/latScale,ay+dy*t],distance=stationDistanceMeters(point,candidate);if(distance<bestDistance){bestDistance=distance;best=candidate;bestSegment=segment}}return best&&bestDistance<=260?{coord:best,segment:bestSegment,distance:bestDistance}:null}
 for(const record of stationClusterRecords){const projected=[];for(const [line,points] of record.lineCoords){const segments=stationSegmentsByLine.get(line);for(const point of points){const placement=projectStationPoint(point,segments);if(!placement)continue;projected.push(placement.coord);const key=line+'|'+stationCoordKey(point[0],point[1]),prior=stationPlacementsByLineCoord.get(key);if(!prior||placement.distance<prior.distance)stationPlacementsByLineCoord.set(key,placement)}}if(projected.length){record.lng=projected.reduce((sum,p)=>sum+p[0],0)/projected.length;record.lat=projected.reduce((sum,p)=>sum+p[1],0)/projected.length}}
 pinRailStationVertices(DATA.stations,stationPlacementsByLineCoord,railUnsharedVerticesByLine,stationCoordKey,railCoordKey);const stationGridStep=.005,stationRecordsByGrid=new Map();function stationGridKey(lng,lat){return Math.floor(lng/stationGridStep)+','+Math.floor(lat/stationGridStep)}for(const record of stationClusterRecords){record.normalizedNames=[...record.names.keys()].map(normalizeFrench);const key=stationGridKey(record.lng,record.lat);if(!stationRecordsByGrid.has(key))stationRecordsByGrid.set(key,[]);stationRecordsByGrid.get(key).push(record)}function nearbyStationRecords(lng,lat,radius=1200){const lonRange=Math.ceil(radius/(111320*Math.max(.4,Math.cos(lat*Math.PI/180))*stationGridStep))+1,latRange=Math.ceil(radius/(111320*stationGridStep))+1,x=Math.floor(lng/stationGridStep),y=Math.floor(lat/stationGridStep),records=[];for(let dx=-lonRange;dx<=lonRange;dx++)for(let dy=-latRange;dy<=latRange;dy++)records.push(...(stationRecordsByGrid.get((x+dx)+','+(y+dy))||[]));return records}
-function stationClusterKeyForPoint(lng,lat){return stationClusterKeyByCoord.get(stationCoordKey(lng,lat))||stationCoordKey(lng,lat)}function stationClusterKeyForStop(stop){const raw=stop?.stationKey;if(raw&&stationClustersByKey.has(raw))return raw;if(raw&&stationClusterKeyByCoord.has(raw))return stationClusterKeyByCoord.get(raw);return stationClusterKeyForPoint(stop?.lng,stop?.lat)}function alignedStationCoord(name,coord,zoom){const placement=stationPlacementsByLineCoord.get(name+'|'+stationCoordKey(coord[0],coord[1]));if(placement&&(isRailVertexPinned(name,placement.segment[0])||isRailVertexPinned(name,placement.segment[1])))return placement.coord.slice();if(isRailVertexPinned(name,coord))return coord.slice();if(!placement)return offsetRailStation(name,coord,zoom);if(zoom<12)return placement.coord.slice();return offsetRailPointOnSegment(name,placement.coord,placement.segment[0],placement.segment[1],zoom,5)}const customNetworkRecordCache=new WeakMap();
+function stationClusterKeyForPoint(lng,lat){return stationClusterKeyByCoord.get(stationCoordKey(lng,lat))||stationCoordKey(lng,lat)}function stationClusterKeyForStop(stop){const raw=stop?.stationKey;if(raw&&stationClustersByKey.has(raw))return raw;if(raw&&stationClusterKeyByCoord.has(raw))return stationClusterKeyByCoord.get(raw);return stationClusterKeyForPoint(stop?.lng,stop?.lat)}function alignedStationCoord(name,coord,zoom){
+ const placement=stationPlacementsByLineCoord.get(name+'|'+stationCoordKey(coord[0],coord[1]));
+ if(!placement)return offsetRailStation(name,coord,zoom);
+ if(zoom<12)return placement.coord.slice();
+ const a=placement.segment[0],b=placement.segment[1];
+ const shiftedA=offsetRailCoordinate(a,name,zoom,5,[[a,b]]),shiftedB=offsetRailCoordinate(b,name,zoom,5,[[a,b]]);
+ const p=map.project([placement.coord[1],placement.coord[0]],zoom),pa=map.project([shiftedA[1],shiftedA[0]],zoom),pb=map.project([shiftedB[1],shiftedB[0]],zoom);
+ const dx=pb.x-pa.x,dy=pb.y-pa.y,length2=dx*dx+dy*dy;
+ if(length2<1e-8)return shiftedA;
+ const t=Math.max(0,Math.min(1,((p.x-pa.x)*dx+(p.y-pa.y)*dy)/length2));
+ const aligned=map.unproject(L.point(pa.x+t*dx,pa.y+t*dy),zoom);
+ return[aligned.lng,aligned.lat];
+}const customNetworkRecordCache=new WeakMap();
 function customNetworkRecord(stop){
  const lng=Number(stop?.lng),lat=Number(stop?.lat),nameKey=normalizeFrench(stop?.name||''),signature=[lng.toFixed(6),lat.toFixed(6),nameKey,String(stop?.stationKey||''),(stop?.stationLines||[]).join('|')].join('|'),cached=stop&&typeof stop==='object'?customNetworkRecordCache.get(stop):null;if(cached?.signature===signature)return cached.record;
  const save=record=>{if(stop&&typeof stop==='object')customNetworkRecordCache.set(stop,{signature,record});return record};if(!Number.isFinite(lng)||!Number.isFinite(lat))return save(null);
@@ -244,6 +310,8 @@ function customLineCode(title,mode='Metro'){const raw=String(title||'').trim().r
 function escapeSvgText(value){return String(value||'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[char]))}
 function customLineLogo(line){const title=String(line?.title||'Ligne');const color=/^#[0-9a-f]{6}$/i.test(line?.color)?line.color:'#314f88';const code=customLineCode(title,customLineMode(line)),fontSize=code.length<=2?54:code.length===3?40:31,textColor=badgeTextColor(color),svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="'+color+'"/><text x="50" y="58" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif" font-size="'+fontSize+'" font-weight="800" fill="'+textColor+'">'+escapeSvgText(code)+'</text></svg>';return'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg)}
 function refreshCustomLineLogo(line){if(!line||typeof line!=='object')return'';line.logo=customLineLogo(line);return line.logo}
+function customModeLogo(mode){return({Metro:'assets/lines-mini/mode-metro.png',RER:'assets/lines-mini/rer.png',Transilien:'assets/lines-mini/transilien.png',Tramway:'assets/lines-mini/tram.png'})[mode]||'assets/lines-mini/mode-metro.png'}
+function syncCustomModePicker(){const selectedMode=document.getElementById('customLineMode')?.value;for(const button of document.querySelectorAll('#customModePicker [data-mode]')){const selected=button.dataset.mode===selectedMode;button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected))}}
 function lineLogo(name){return LINE_LOGOS[name]||''}
 function networkLogoHtml(name,extra=''){const src=lineLogo(name);return src?'<span class="route-badge line-logo-badge '+extra+'" title="'+escapeHtml(name)+'"><img src="'+src+'" alt="'+escapeHtml(badgeText(name))+'"></span>':'<span class="route-badge" style="background:'+lineMeta[name].color+';color:'+badgeTextColor(lineMeta[name].color)+'">'+escapeHtml(badgeText(name))+'</span>'}
 function generatedLineLogoHtml(line,extra=''){const safeLine=line||{title:'Ligne',color:'#314f88'},title=String(safeLine.title||'Ligne'),src=safeLine.logo||refreshCustomLineLogo(safeLine),code=customLineCode(title,customLineMode(safeLine));return'<span class="route-badge line-logo-badge generated-line-logo '+extra+'" title="'+escapeHtml(title)+'"><img src="'+escapeHtml(src)+'" alt="'+escapeHtml(code)+'"></span>'}
@@ -332,7 +400,7 @@ const connectStationInput=document.getElementById('existingStationSearch');funct
 document.getElementById('connectStationButton').addEventListener('click',()=>{const line=activeLine(),result=resolveConnectableStation(connectStationInput.value);if(!line){setStatus('Choisis ou crée une ligne avant d’ajouter une gare.',true);return}if(!result.station){setStatus(result.ambiguous?'Plusieurs gares correspondent : choisis une suggestion complète.':'Gare introuvable : choisis une station du réseau.',true);return}const station=result.station,key=[Number(station.lng).toFixed(5),Number(station.lat).toFixed(5)].join(',');if(line.stops.some(stop=>stop.stationKey===station.key||[Number(stop.lng).toFixed(5),Number(stop.lat).toFixed(5)].join(',')===key)){setStatus('Cette gare est déjà présente sur la ligne.',true);return}if(drawing)setDrawing(false);line.stops.push({name:station.name,lat:station.lat,lng:station.lng,stationKey:station.key,stationNames:station.names,stationLines:station.lines});connectStationInput.value='';persist();renderCustom();map.flyTo([station.lat,station.lng],Math.max(14,map.getZoom()),{duration:.65});setStatus('Gare raccordée : '+station.name+' · '+station.lines.join(', '))});
 function setStatus(text,bad=false){const s=document.getElementById('saveStatus');s.textContent=text;s.className='status'+(bad?' bad':' good')}
 function persist(){try{localStorage.setItem(STORAGE,JSON.stringify(userLines));setStatus('Enregistré dans ce navigateur.')}catch{setStatus('Stockage indisponible : exporte la ligne en GeoJSON.',true)}}
-function syncFields(){const l=activeLine();if(!l)return;refreshCustomLineLogo(l);titleInput.value=l.title;colorInput.value=l.color;modeInput.value=customLineMode(l);const preview=document.getElementById('customLogoPreviewImage');if(preview){preview.src=l.logo;preview.hidden=map.getZoom()<CUSTOM_DETAIL_ZOOM;}drawButton.textContent=drawing?'Terminer le tracé':(l.stops.length?'Reprendre le tracé':'Commencer le tracé');renderSavedLines();renderCustom()}
+function syncFields(){const l=activeLine();if(!l)return;refreshCustomLineLogo(l);titleInput.value=l.title;colorInput.value=l.color;modeInput.value=customLineMode(l);syncCustomModePicker();const preview=document.getElementById('customLogoPreviewImage');if(preview){preview.src=customModeLogo(customLineMode(l));preview.alt='Icône '+customLineMode(l)+' — '+l.title;preview.hidden=false;}drawButton.textContent=drawing?'Terminer le tracé':(l.stops.length?'Reprendre le tracé':'Commencer le tracé');renderSavedLines();renderCustom()}
 function renderStopList(){
  const host=document.getElementById('stopList'),summary=document.getElementById('stopSummary'),line=activeLine(),stops=line?.stops||[];
  summary.textContent=stops.length+' arrêt'+(stops.length===1?'':'s')+' · '+Math.max(0,stops.length-1)+' tronçon'+(stops.length===2?'':'s');
@@ -457,6 +525,7 @@ drawButton.addEventListener('click',()=>setDrawing(!drawing));
 titleInput.addEventListener('input',()=>{const l=activeLine();if(!l)return;l.title=titleInput.value||'Ligne hypothétique';refreshCustomLineLogo(l);persist();syncFields()});
 colorInput.addEventListener('input',()=>{const l=activeLine();if(!l)return;l.color=colorInput.value;refreshCustomLineLogo(l);persist();syncFields()});
 const customModeColors={Metro:'#ec0016',RER:'#8b2c83',Transilien:'#4777b8',Tramway:'#008b78'};modeInput.addEventListener('change',()=>{const l=activeLine();if(!l)return;const previousMode=customLineMode(l),previousTitle=l.title;l.mode=modeInput.value;l.color=customModeColors[l.mode]||'#314f88';colorInput.value=l.color;if(/^(?:M\d+[A-Z]?|RER\s+[A-Z0-9]+|TRAIN\s+[A-Z0-9]+|T\d+[A-Z]?)$/i.test(previousTitle)||previousTitle==='Ma ligne hypothétique')titleInput.value=l.title=customLineDefaultTitle(l.mode,userLines.filter(line=>line.id!==l.id&&customLineMode(line)===l.mode).length+1);refreshCustomLineLogo(l);persist();syncFields()});
+document.querySelectorAll('#customModePicker [data-mode]').forEach(button=>button.addEventListener('click',()=>{modeInput.value=button.dataset.mode;modeInput.dispatchEvent(new Event('change',{bubbles:true}))}));
 document.getElementById('newLineButton').addEventListener('click',()=>{setDrawing(false);const mode=modeInput.value,ordinal=userLines.filter(line=>customLineMode(line)===mode).length+1,l={id:makeId(),title:customLineDefaultTitle(mode,ordinal),color:colorInput.value,mode,stops:[]};refreshCustomLineLogo(l);userLines.push(l);activeId=l.id;stopNameInput.value='';syncFields();persist()});
 
 document.getElementById('savedLines').addEventListener('change',e=>{setDrawing(false);activeId=e.target.value;stopNameInput.value='';syncFields()});
