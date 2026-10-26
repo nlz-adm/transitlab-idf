@@ -66,31 +66,32 @@ function normalizeSharedTrackSegmentation(lines){
 function splitRepeatedRouteChains(lines){
  const output=[];
  const coordKey=coord=>Number(coord[0]).toFixed(9)+','+Number(coord[1]).toFixed(9);
+ const repairChain=(feature,initial)=>{
+  let coords=initial.map(coord=>coord.slice()),guard=0;
+  while(coords.length>=2&&guard++<initial.length+2){
+   const seen=new Map(),repeat=null;
+   for(let i=0;i<coords.length;i++){
+    const key=coordKey(coords[i]);
+    if(seen.has(key)&&i<coords.length-1){repeat={start:seen.get(key),end:i};break}
+    if(!seen.has(key))seen.set(key,i);
+   }
+   if(!repeat)break;
+   const {start,end}=repeat;
+   // Keep any prefix before the repeated junction as its own branch. The
+   // repeated section is reversed and joined to the suffix, avoiding the
+   // long artificial "return" segment produced by concatenating route pieces
+   // whose directions disagree.
+   const prefix=coords.slice(0,start+1);
+   if(prefix.length>=2)output.push({...feature,geometry:{type:'LineString',coordinates:prefix}});
+   coords=coords.slice(start,end).reverse().concat(coords.slice(end+1));
+  }
+  if(coords.length>=2)output.push({...feature,geometry:{type:'LineString',coordinates:coords}});
+ };
  for(const feature of lines||[]){
   const geometry=feature.geometry;
   if(!geometry||!['LineString','MultiLineString'].includes(geometry.type)){output.push(feature);continue}
   const chains=geometry.type==='MultiLineString'?geometry.coordinates:[geometry.coordinates];
-  for(const coords of chains||[]){
-   if(!Array.isArray(coords)||coords.length<2)continue;
-   let start=0;
-   while(start<coords.length-1){
-    const seen=new Map([[coordKey(coords[start]),start]]);
-    let splitAt=-1;
-    for(let i=start+1;i<coords.length;i++){
-     const key=coordKey(coords[i]);
-     if(seen.has(key)&&i<coords.length-1){splitAt=i;break}
-     if(!seen.has(key))seen.set(key,i);
-    }
-    const end=splitAt<0?coords.length:splitAt;
-    const part=coords.slice(start,end);
-    if(part.length>=2)output.push({...feature,geometry:{type:'LineString',coordinates:part}});
-    if(splitAt<0)break;
-    // The segment from the previous vertex back to a repeated vertex is a
-    // synthetic connector introduced when separate route branches were joined.
-    // Start the next independent path at the repeated vertex instead.
-    start=splitAt;
-   }
-  }
+  for(const coords of chains||[])if(Array.isArray(coords)&&coords.length>=2)repairChain(feature,coords);
  }
  return output;
 }
