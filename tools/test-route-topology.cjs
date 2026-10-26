@@ -171,4 +171,21 @@ const reversalOffset=offsetContext.offsetRailCoordinate(p1,'Metro A',12,5,[[p0,p
 assert.ok(reversalOffset.every(Number.isFinite) && Math.hypot(reversalOffset[0]-1,reversalOffset[1])<=5.001,
   'near-reversal geometry must fall back to a single edge offset rather than create a spike');
 
-console.log('Route topology tests passed: 7 junction/station anchoring cases plus offset-join regressions.');
+
+const alignedMatch = source.match(/function alignedStationCoord\(name,coord,zoom\)\{[\s\S]*?\n\}/);
+assert.ok(alignedMatch, 'map-app.js must expose the station-to-rendered-route alignment helper');
+const alignedContext = {
+ stationPlacementsByLineCoord: new Map([['Metro A|0.50000,0.00000',{coord:[0.5,0],segment:[[0,0],[1,0]]}]]),
+ stationCoordKey: (lng,lat)=>[Number(lng).toFixed(5),Number(lat).toFixed(5)].join(','),
+ offsetRailStation: (name,coord)=>coord.slice(),
+ offsetRailCoordinate: (coord)=>[coord[0],coord[1]+0.01],
+ map:{project:([lat,lng])=>({x:lng,y:lat}),unproject:p=>({lng:p.x,lat:p.y})},
+ L:{point:(x,y)=>({x,y})}
+};
+vm.createContext(alignedContext);
+vm.runInContext(alignedMatch[0],alignedContext);
+const stationAtLowZoom=alignedContext.alignedStationCoord('Metro A',[0.5,0],11);
+const stationAtHighZoom=alignedContext.alignedStationCoord('Metro A',[0.5,0],13);
+assert.deepEqual(Array.from(stationAtLowZoom),[0.5,0],'low-zoom station positions must remain on the base route');
+assert.ok(Math.abs(stationAtHighZoom[0]-0.5)<1e-9&&Math.abs(stationAtHighZoom[1]-0.01)<1e-9,'high-zoom station markers must project onto the actual offset segment');
+\nconsole.log('Route topology tests passed: 7 junction/station anchoring cases plus offset-join regressions.');
