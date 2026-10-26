@@ -36,16 +36,19 @@ try {
 
   // Move to neighborhood scale explicitly and wait for the asynchronous IRIS refresh.
   await page.evaluate(() => window.__transitLabMap.setView([48.8566, 2.3522], 15));
-  await page.waitForTimeout(3000);
-  const labelDiagnostics = await page.evaluate(() => ({
-    labels: document.querySelectorAll('.iris-name-label').length,
-    status: document.getElementById('saveStatus')?.textContent || '',
-    zoom: window.__transitLabMap?.getZoom?.() ?? null,
-    paneExists: !!document.querySelector('.leaflet-population-density-pane'),
-    featurePaths: document.querySelectorAll('.leaflet-population-density-pane path, .leaflet-population-density-pane canvas').length,
-  }));
-  if (!labelDiagnostics.labels) {
-    throw new Error('Aucune étiquette IRIS au zoom de quartier. Diagnostic navigateur : ' + JSON.stringify(labelDiagnostics));
+  try {
+    await page.waitForFunction(() => document.querySelectorAll('.iris-name-label').length > 0, null, { timeout: 30000 });
+  } catch {
+    const labelDiagnostics = await page.evaluate(() => ({
+      labels: document.querySelectorAll('.iris-name-label').length,
+      status: document.getElementById('saveStatus')?.textContent || '',
+      zoom: window.__transitLabMap?.getZoom?.() ?? null,
+      center: window.__transitLabMap?.getCenter?.() ?? null,
+      paneExists: !!document.querySelector('.leaflet-population-density-pane'),
+      featurePaths: document.querySelectorAll('.leaflet-population-density-pane path, .leaflet-population-density-pane canvas').length,
+      irisRequests: performance.getEntriesByType('resource').filter(entry => /population-iris/.test(entry.name)).map(entry => ({url: entry.name, durationMs: Math.round(entry.duration)})),
+    }));
+    throw new Error('Aucune étiquette IRIS au zoom de quartier après 30 s. Diagnostic navigateur : ' + JSON.stringify(labelDiagnostics));
   }
 
   await densityToggle.uncheck();
