@@ -100,7 +100,28 @@ function pinRailStationVertices(stations,placements,pinned,stationKey,coordKey){
  }
 }
 function railNormal(edge,zoom){const a=map.project([edge.a[1],edge.a[0]],zoom),b=map.project([edge.b[1],edge.b[0]],zoom),dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy)||1;return[-dy/length,dx/length]}
-function offsetRailCoordinate(coord,name,zoom,spacing=5,neighbors=[]){if(isRailVertexPinned(name,coord))return coord.slice();let dx=0,dy=0,count=0;for(const pair of neighbors){const edge=sharedTrackEdges.get(railEdgeKey(pair[0],pair[1]));if(!edge||!edge.offsets.has(name))continue;const normal=railNormal(edge,zoom),amount=edge.offsets.get(name)*spacing;dx+=normal[0]*amount;dy+=normal[1]*amount;count++}if(!count)return coord.slice();const point=map.project([coord[1],coord[0]],zoom);const shifted=map.unproject(L.point(point.x+dx/count,point.y+dy/count),zoom);return[shifted.lng,shifted.lat]}
+function offsetRailCoordinate(coord,name,zoom,spacing=5,neighbors=[]){
+ if(isRailVertexPinned(name,coord))return coord.slice();
+ const normals=[];
+ for(const pair of neighbors){
+  const edge=sharedTrackEdges.get(railEdgeKey(pair[0],pair[1]));
+  if(!edge||!edge.offsets.has(name))continue;
+  const normal=railNormal(edge,zoom),amount=edge.offsets.get(name)*spacing;
+  normals.push([normal[0]*amount,normal[1]*amount,normal[0],normal[1],amount]);
+ }
+ if(!normals.length)return coord.slice();
+ let dx=0,dy=0;
+ if(normals.length===1){dx=normals[0][0];dy=normals[0][1]}
+ else{
+  const n0=normals[0],n1=normals[1],sx=n0[2]+n1[2],sy=n0[3]+n1[3],sumLength=Math.hypot(sx,sy);
+  const dot=Math.max(.25,Math.abs((sx/(sumLength||1))*n0[2]+(sy/(sumLength||1))*n0[3]));
+  const miter=Math.min(2.5,1/dot),direction=(n0[4]+n1[4])<0?-1:1;
+  if(sumLength<1e-5||n0[4]*n1[4]<0){dx=n0[0];dy=n0[1]}
+  else{dx=sx/sumLength*Math.abs((n0[4]+n1[4])/2)*miter*direction;dy=sy/sumLength*Math.abs((n0[4]+n1[4])/2)*miter*direction}
+ }
+ const point=map.project([coord[1],coord[0]],zoom),shifted=map.unproject(L.point(point.x+dx,point.y+dy),zoom);
+ return[shifted.lng,shifted.lat]
+}
 function offsetRailChain(coords,name,zoom,spacing=5){return coords.map((coord,index)=>{const neighbors=[];if(index>0)neighbors.push([coords[index-1],coord]);if(index+1<coords.length)neighbors.push([coord,coords[index+1]]);return offsetRailCoordinate(coord,name,zoom,spacing,neighbors)})}
 function offsetRailFeature(feature,name,zoom,spacing=5){let cache=shiftedFeatureCache.get(feature);if(!cache){cache=new Map();shiftedFeatureCache.set(feature,cache)}const cacheKey=name+'|'+zoom.toFixed(2)+'|'+spacing;if(cache.has(cacheKey)){const cached=cache.get(cacheKey);cache.delete(cacheKey);cache.set(cacheKey,cached);return cached}const geometry=feature.geometry,coordinates=geometry.type==='MultiLineString'?geometry.coordinates.map(part=>offsetRailChain(part,name,zoom,spacing)):offsetRailChain(geometry.coordinates,name,zoom,spacing),shifted={...feature,geometry:{...geometry,coordinates}};cache.set(cacheKey,shifted);while(cache.size>2)cache.delete(cache.keys().next().value);return shifted}
 function offsetRailPointOnSegment(name,coord,a,b,zoom,spacing=5){return offsetRailCoordinate(coord,name,zoom,spacing,[[a,b]])}
