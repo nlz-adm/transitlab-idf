@@ -42,7 +42,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate-iris:
@@ -50,6 +50,35 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Generate and commit official IDFM rail geometry
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --location --retry 5 --retry-all-errors --connect-timeout 30 --max-time 180 \\
+            "https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/traces-du-reseau-ferre-idf/exports/geojson" \\
+            --output /tmp/rail-source.geojson
+          python tools/refresh_official_rail_traces.py /tmp/rail-source.geojson assets/official-rail-traces.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('assets/official-rail-traces.json').read_text(encoding='utf-8'))
+          features=data.get('features', [])
+          lines={f.get('properties',{}).get('line') for f in features}
+          print(f"Generated official asset: {len(features)} segments, {len(lines)} line labels")
+          if len(features)<500 or len(lines)<20 or 'RER C' not in lines or 'TRAM 6' not in lines:
+              raise SystemExit('Generated official IDFM asset failed validation')
+          PY
+          if git diff --quiet -- assets/official-rail-traces.json; then
+            echo "Official IDFM asset is already current."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add assets/official-rail-traces.json
+            git commit -m "Add generated official IDFM rail geometry"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          fi
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
