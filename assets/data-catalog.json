@@ -1,5 +1,5 @@
 {
-  "version": "idf-custom-transport-20261026-iris-label-v1",
+  "version": "idf-custom-transport-20261026-iris-label-v2",
   "generatedAt": "2026-10-26",
   "strategy": "native-esm-lazy-map",
   "layers": {
