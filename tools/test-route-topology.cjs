@@ -117,7 +117,7 @@ assert.equal(context.isRailVertexPinned('Unknown line', [1, 0]), false,
   'unknown lines keep the previous fallback behavior');
 
 
-const offsetMatch = source.match(/function offsetRailCoordinate\(coord,name,zoom,spacing=5,neighbors=\[\]\)\{[\s\S]*?\n\}/);
+const offsetMatch = source.match(/function offsetRailCoordinate[\s\S]*?\n\}/);
 assert.ok(offsetMatch, 'map-app.js must expose the real shared-route offset helper');
 const offsetContext = {
   sharedTrackEdges: new Map(),
