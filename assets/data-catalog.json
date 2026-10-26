@@ -41,11 +41,11 @@
   "scripts": {
     "boot": {
       "url": "assets/map-boot.js",
-      "bytes": 672
+      "bytes": 675
     },
     "app": {
       "url": "assets/map-app.js",
-      "bytes": 146542
+      "bytes": 146971
     },
     "worker": {
       "url": "assets/line-index-worker.js",
