@@ -258,7 +258,7 @@ function alignedTransferHubCoord(clusterKey,fallback,zoom,anchorCoord){
    if(Number.isFinite(point.x)&&Number.isFinite(point.y))projected.push(point);
   });
  }
- if(projected.length<2)return fallback.slice();
+ if(projected.length<2)return anchorCoord?alignedStationCoord(lineNames.find(name=>map.hasLayer(routeLayers[name])&&stationLayersByLine[name]?.getLayers?.().some(shape=>shape._transferClusterKey===clusterKey&&shape._transferRawCoord&&stationDistanceMeters(shape._transferRawCoord,anchorCoord)<=25))||'',anchorCoord,zoom):fallback.slice();
  const mean=L.point(projected.reduce((sum,p)=>sum+p.x,0)/projected.length,projected.reduce((sum,p)=>sum+p.y,0)/projected.length);
  const ll=map.unproject(mean,zoom);
  return[ll.lng,ll.lat];
