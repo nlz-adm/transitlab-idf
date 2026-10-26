@@ -1,5 +1,5 @@
 {
-  "version": "idf-iris-hydrography-labels-v3-20261026",
+  "version": "idf-custom-transport-20261026",
   "generatedAt": "2026-10-26",
   "strategy": "native-esm-lazy-map",
   "layers": {
@@ -45,7 +45,7 @@
     },
     "app": {
       "url": "assets/map-app.js",
-      "bytes": 144720
+      "bytes": 146805
     },
     "worker": {
       "url": "assets/line-index-worker.js",

@@ -61,9 +61,11 @@
 <hr class="divider">
 <section class="section">
 <div class="section-title">Créer une ligne</div>
-<label class="field-label" for="lineTitle">Nom de la ligne</label>
-<input class="field" id="lineTitle" value="Ma ligne hypothétique" maxlength="50">
-<div class="fieldrow"><div><label class="field-label" for="nextStopName">Nom du prochain arrêt (facultatif)</label><input class="field" id="nextStopName" placeholder="Ex. Chessy — Gare"></div><div><label class="field-label" for="lineColor">Couleur</label><input class="field color" id="lineColor" type="color" value="#314f88" aria-label="Couleur de la ligne"></div></div><div class="custom-logo-preview" aria-live="polite"><span>Logo généré automatiquement</span><img id="customLogoPreviewImage" class="line-logo-legend" alt="Logo de la ligne personnalisée"></div>
+<label class="field-label" for="customLineMode">Mode de transport</label>
+<select class="field" id="customLineMode"><option value="Metro">Métro</option><option value="RER">RER</option><option value="Transilien">Transilien</option><option value="Tramway">Tramway</option></select>
+<label class="field-label" for="lineTitle">Nom ou code de la ligne</label>
+<input class="field" id="lineTitle" value="M19" maxlength="50" placeholder="Ex. M19, RER F, Train X, T15">
+<div class="fieldrow"><div><label class="field-label" for="nextStopName">Nom du prochain arrêt (facultatif)</label><input class="field" id="nextStopName" placeholder="Ex. Chessy — Gare"></div><div><label class="field-label" for="lineColor">Couleur</label><input class="field color" id="lineColor" type="color" value="#ec0016" aria-label="Couleur de la ligne"></div></div><div class="custom-logo-preview" aria-live="polite"><span>Logo généré automatiquement</span><img id="customLogoPreviewImage" class="line-logo-legend" alt="Logo de la ligne personnalisée"></div>
 <div class="button-row" style="margin-top:9px"><button class="button primary" id="drawButton">Commencer le tracé</button><button class="button small" id="newLineButton">Nouvelle ligne</button></div>
 <div class="drawing-note" id="drawingNote">Clique sur la carte pour ajouter un arrêt. Les points peuvent être déplacés après leur pose.</div>
 <label class="snap-toggle"><input id="snapToStations" type="checkbox" checked>Caler près d’une gare (rayon de 24 px)</label>
@@ -87,7 +89,7 @@
 </div>
 <div class="trace-preview-modal" id="tracePreviewModal" hidden role="dialog" aria-modal="true" aria-labelledby="tracePreviewTitle"><div class="trace-preview-dialog"><header class="trace-preview-head"><div><h2 id="tracePreviewTitle">Aperçu du tracé</h2><p id="tracePreviewSubtitle">Ligne personnalisée</p></div><button class="trace-preview-close" id="tracePreviewClose" type="button" aria-label="Fermer l’aperçu">×</button></header><div class="trace-preview-content" id="tracePreviewContent" role="img" aria-label="Aperçu du tracé cartographique"></div><footer class="trace-preview-foot"><span>Vérifie le placement des stations, noms et correspondances avant l’export.</span><div class="trace-preview-actions"><button class="button small" id="tracePreviewCancel" type="button">Fermer</button><button class="button small primary" id="tracePreviewDownload" type="button">Télécharger PNG</button></div></footer></div></div>
 <script src="assets/leaflet.js" defer></script>
-<script type="module" src="assets/map-boot.js?v=idf-iris-hydrography-labels-v3-20261026" defer></script>
+<script type="module" src="assets/map-boot.js?v=idf-custom-transport-20261026" defer></script>
 </body>
 </html>
 

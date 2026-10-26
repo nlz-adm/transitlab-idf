@@ -1,4 +1,4 @@
-const CACHE_NAME = 'transitlab-idf-iris-hydrography-labels-v3-20261026';
+const CACHE_NAME = 'transitlab-idf-custom-transport-20261026';
 const STATIC_ASSETS = [
   './',
   './index.html',
