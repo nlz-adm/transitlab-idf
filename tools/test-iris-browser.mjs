@@ -54,13 +54,13 @@ try {
 
   const labelRefreshMs = Date.now() - labelRefreshStarted;
   const labelCount = await page.locator('.iris-name-label').count();
+  await page.screenshot({ path: '/tmp/iris-map-smoke.png', fullPage: false });
   if (labelRefreshMs > 5000) {
     throw new Error(`Le premier libellé de quartier met trop longtemps à apparaître : ${labelRefreshMs} ms (seuil CI : 5000 ms).`);
   }
   await densityToggle.uncheck();
   await page.locator('#communesBoundaryToggle').check();
   await page.waitForTimeout(500);
-  await page.screenshot({ path: '/tmp/iris-map-smoke.png', fullPage: false });
 
   if (errors.length) throw new Error('Erreurs JavaScript navigateur : ' + errors.join(' | '));
   console.log(JSON.stringify({
