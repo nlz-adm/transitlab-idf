@@ -108,7 +108,7 @@ try {
   // Re-check the same transfer markers at both a wider and a closer zoom.
   // Leaflet markers and route paths must remain attached as scale changes.
   for (const zoom of [11, 17]) {
-    await page.evaluate(level => window.__transitLabMap.setView([48.8007, 2.1713], level, { animate: false }), zoom);
+    await page.evaluate(level => { window.__transitLabMap.setView([48.8007, 2.1713], level, { animate: false }); }, zoom);
     await page.waitForTimeout(250);
     const zoomAlignment = await page.evaluate(() => {
       const map = window.__transitLabMap;
