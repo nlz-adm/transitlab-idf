@@ -154,7 +154,7 @@ const offsetContext = {
   railEdgeKey: (a,b) => String(a[0])+','+String(a[1])+'|'+String(b[0])+','+String(b[1]),
   isRailVertexPinned: () => false,
   railNormal: edge => edge.normal,
-  map: { project: ([lng,lat]) => ({x:lng,y:lat}), unproject: p => ({lng:p.x,lat:p.y}) },
+  map: { project: ([lat,lng]) => ({x:lng,y:lat}), unproject: p => ({lng:p.x,lat:p.y}) },
   L: { point: (x,y) => ({x,y}) }
 };
 vm.createContext(offsetContext);
