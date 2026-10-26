@@ -81,7 +81,8 @@ for (const candidate of candidates) {
   const key = candidate.lines.join(' ↔ ');
   const record = byPair.get(key) || { pair: key, candidateSegments: 0, maxOverlapMeters: 0, examples: [] };
   record.candidateSegments++;
-  record.maxOverlapMeters = Math.max(record.maxOverlapMeters, candidate.overlapMeters);\n  if (record.examples.length < 3) record.examples.push({ overlapMeters: candidate.overlapMeters, offsetMeters: candidate.offsetMeters, a: candidate.a, b: candidate.b, otherA: candidate.otherA, otherB: candidate.otherB });
+  record.maxOverlapMeters = Math.max(record.maxOverlapMeters, candidate.overlapMeters);
+  if (record.examples.length < 3) record.examples.push({ overlapMeters: candidate.overlapMeters, offsetMeters: candidate.offsetMeters, a: candidate.a, b: candidate.b, otherA: candidate.otherA, otherB: candidate.otherB });
   byPair.set(key, record);
 }
 const report = {
@@ -96,5 +97,9 @@ else {
   process.stdout.write('Route overlap audit (candidates, not confirmed errors)\n');
   process.stdout.write('Lines: ' + report.inputLines + '; segments: ' + report.auditedSegments + '\n');
   process.stdout.write('Candidate segment pairs: ' + report.candidateSegmentPairs + '\n');
-  for (const pair of report.linePairs.slice(0, 20)) process.stdout.write(pair.pair + ': ' + pair.candidateSegments + ' candidates; longest overlap ' + pair.maxOverlapMeters + ' m\n');
+  for (const pair of report.linePairs.slice(0, 20)) {
+    process.stdout.write(pair.pair + ': ' + pair.candidateSegments + ' candidates; longest overlap ' + pair.maxOverlapMeters + ' m\n');
+    const example = pair.examples[0];
+    if (example) process.stdout.write('  example coordinates: ' + JSON.stringify([example.a, example.b, example.otherA, example.otherB]) + ' (offset <= ' + example.offsetMeters + ' m)\n');
+  }
 }
