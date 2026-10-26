@@ -98,7 +98,7 @@ function splitRepeatedRouteChains(lines){
 // Prefer the official IDFM rail geometry when the checked-in generated dataset is available.
 // The existing bundled network remains a safe fallback if the official refresh has not run yet.
 try {
- const officialRail=await fetchJson(new URL('assets/official-rail-traces.json?v=idfm-rail-v1',document.baseURI),{cache:'no-store'});
+ const officialResponse=await fetch(new URL('assets/official-rail-traces.json?v=idfm-rail-v2',document.baseURI),{cache:'no-store'}); if(!officialResponse.ok)throw new Error('HTTP '+officialResponse.status); const officialRail=await officialResponse.json();
  const officialFeatures=(officialRail?.features||[]).filter(feature=>feature?.geometry&&['LineString','MultiLineString'].includes(feature.geometry.type)&&feature.properties?.line);
  const officialLineNames=new Set(officialFeatures.map(feature=>feature.properties.line));
  if(officialFeatures.length>=500&&officialLineNames.size>=20&&[...officialLineNames].some(name=>/^RER C$/i.test(name))&&[...officialLineNames].some(name=>/^TRAM 6$/i.test(name))){
