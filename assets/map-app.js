@@ -63,7 +63,38 @@ function normalizeSharedTrackSegmentation(lines){
  }
  return lines;
 }
-normalizeSharedTrackSegmentation(DATA.lines);
+function splitRepeatedRouteChains(lines){
+ const output=[];
+ const coordKey=coord=>Number(coord[0]).toFixed(9)+','+Number(coord[1]).toFixed(9);
+ for(const feature of lines||[]){
+  const geometry=feature.geometry;
+  if(!geometry||!['LineString','MultiLineString'].includes(geometry.type)){output.push(feature);continue}
+  const chains=geometry.type==='MultiLineString'?geometry.coordinates:[geometry.coordinates];
+  for(const coords of chains||[]){
+   if(!Array.isArray(coords)||coords.length<2)continue;
+   let start=0;
+   while(start<coords.length-1){
+    const seen=new Map([[coordKey(coords[start]),start]]);
+    let splitAt=-1;
+    for(let i=start+1;i<coords.length;i++){
+     const key=coordKey(coords[i]);
+     if(seen.has(key)&&i<coords.length-1){splitAt=i;break}
+     if(!seen.has(key))seen.set(key,i);
+    }
+    const end=splitAt<0?coords.length:splitAt;
+    const part=coords.slice(start,end);
+    if(part.length>=2)output.push({...feature,geometry:{type:'LineString',coordinates:part}});
+    if(splitAt<0)break;
+    // The segment from the previous vertex back to a repeated vertex is a
+    // synthetic connector introduced when separate route branches were joined.
+    // Start the next independent path at the repeated vertex instead.
+    start=splitAt;
+   }
+  }
+ }
+ return output;
+}
+DATA.lines=splitRepeatedRouteChains(DATA.lines);\nnormalizeSharedTrackSegmentation(DATA.lines);
 const buildSharedTrackIndex=lines=>{if(!window.Worker)return Promise.resolve(null);return new Promise(resolve=>{let worker;try{worker=new Worker(new URL('assets/line-index-worker.js',document.baseURI),{type:'module'})}catch{resolve(null);return}const done=value=>{worker.terminate();resolve(value)};worker.onmessage=event=>done(event.data);worker.onerror=()=>done(null);worker.postMessage({type:'indexSharedTracks',lines})})};
 const sharedIndex=await buildSharedTrackIndex(DATA.lines);
 if(sharedIndex?.edges){for(const record of sharedIndex.edges){const edge={a:record.a,b:record.b,lines:new Set(record.lines),offsets:new Map(record.offsets)};sharedTrackEdges.set(railEdgeKey(edge.a,edge.b),edge);for(const coord of [edge.a,edge.b]){const vertexKey=railCoordKey(coord);if(!sharedTrackVertices.has(vertexKey))sharedTrackVertices.set(vertexKey,[]);sharedTrackVertices.get(vertexKey).push(edge)}}}else{for(const feature of DATA.lines){const name=feature.properties.line,coordinates=feature.geometry.coordinates;if(feature.geometry.type!=='LineString')continue;for(let i=1;i<coordinates.length;i++){const a=coordinates[i-1],b=coordinates[i],key=railEdgeKey(a,b);let edge=sharedTrackEdges.get(key);if(!edge){edge={a:a.slice(),b:b.slice(),lines:new Set(),offsets:new Map()};sharedTrackEdges.set(key,edge)}edge.lines.add(name)}}for(const [key,edge] of sharedTrackEdges){if(edge.lines.size<2){sharedTrackEdges.delete(key);continue}const names=[...edge.lines].sort((a,b)=>a.localeCompare(b,'fr',{numeric:true}));names.forEach((name,index)=>edge.offsets.set(name,index-(names.length-1)/2));for(const coord of [edge.a,edge.b]){const vertexKey=railCoordKey(coord);if(!sharedTrackVertices.has(vertexKey))sharedTrackVertices.set(vertexKey,[]);sharedTrackVertices.get(vertexKey).push(edge)}}}
