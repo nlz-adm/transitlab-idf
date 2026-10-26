@@ -22,6 +22,17 @@ const malformedBranch = [{properties:{line:'TRAM 6',mode:'Tramway'},geometry:{ty
 const splitBranch = splitContext.splitRepeatedRouteChains(malformedBranch);
 assert.equal(splitBranch.length, 1, 'a repeated interior vertex at the start of a concatenated branch must be repaired as one continuous route');
 assert.deepEqual(Array.from(splitBranch[0].geometry.coordinates), [[2.171307,48.800716],[2.178798,48.785121],[2.176976,48.784057],[2.176848,48.783692]], 'the route must reverse the first branch at the repeated junction and continue without a long artificial return segment');
+const realNetworkForRepeatTest = JSON.parse(fs.readFileSync('assets/network-data.json','utf8'));
+const repairedRealNetwork = splitContext.splitRepeatedRouteChains(realNetworkForRepeatTest.lines);
+const repeatKey = coord => Number(coord[0]).toFixed(9)+','+Number(coord[1]).toFixed(9);
+let remainingInteriorRepeats=0;
+for(const feature of repairedRealNetwork){
+ const coords=feature.geometry?.coordinates||[],seen=new Set();
+ for(let i=0;i<coords.length;i++){const key=repeatKey(coords[i]);if(seen.has(key)&&i<coords.length-1)remainingInteriorRepeats++;seen.add(key)}
+}
+assert.equal(remainingInteriorRepeats, 0, 'repaired real route geometry must not contain repeated interior vertices that create artificial return segments');
+assert.ok(repairedRealNetwork.length >= realNetworkForRepeatTest.lines.length, 'route repair must preserve all branches as line features');
+
 const networkForSplitTest = JSON.parse(fs.readFileSync('assets/network-data.json','utf8'));
 const splitRealNetwork = splitContext.splitRepeatedRouteChains(networkForSplitTest.lines);
 const coordKeyForSplit = c => Number(c[0]).toFixed(9)+','+Number(c[1]).toFixed(9);
