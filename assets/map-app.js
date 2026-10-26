@@ -95,6 +95,47 @@ function splitRepeatedRouteChains(lines){
  }
  return output;
 }
+// Prefer official IDFM geometry. Try the generated local asset first; if it is missing,
+// fetch the authoritative GeoJSON export directly so a failed scheduled refresh does not
+// silently leave the map on the bundled network.
+const normalizeOfficialLine = value => {
+ let line=String(value||'').toUpperCase().replace(/-/g,' ').replace(/\s+/g,' ').trim();
+ line=line.replace(/^TRAMWAY T/,'TRAM ').replace(/^TRAM T/,'TRAM ').replace(/^METRO M/,'METRO ');
+ if(/^M\d+$/.test(line))line='METRO '+line.slice(1);
+ else if(/^T\d+$/.test(line))line='TRAM '+line.slice(1);
+ else if(/^LIGNE /.test(line))line='TRAIN '+line.slice(6);
+ return line;
+};
+const normalizeOfficialFeature = feature => {
+ const p=feature?.properties||{}, raw=String(p.mode||p.reseau||'').toUpperCase();
+ const line=normalizeOfficialLine(p.res_com||p.nomlong||p.nom_long||p.route_long_name||p.route_short_name||p.line||p.libelle||p.nom||'');
+ if(!line||!feature?.geometry||!['LineString','MultiLineString'].includes(feature.geometry.type))return null;
+ let mode='Transilien';
+ if(line.startsWith('METRO ')||raw.includes('METRO'))mode='Metro';
+ else if(line.startsWith('RER ')||raw.includes('RER'))mode='RER';
+ else if(line.startsWith('TRAM ')||raw.includes('TRAM'))mode='Tramway';
+ else if(line==='C1'||raw.includes('CABLE')||raw.includes('NAVETTE'))mode='Navette';
+ let color=String(p.colourweb_hexa||p.couleur||p.color||p.route_color||'65758b').replace(/^#/,'').toLowerCase();
+ if(!/^[0-9a-f]{6}$/.test(color))color='65758b';
+ return {type:'Feature',properties:{...p,line,mode,color,source:'Île-de-France Mobilités'},geometry:feature.geometry};
+};
+try {
+ let officialRail;
+ const localResponse=await fetch(new URL('assets/official-rail-traces.json?v=idfm-rail-v3',document.baseURI),{cache:'no-store'});
+ if(localResponse.ok)officialRail=await localResponse.json();
+ else {
+  console.warn('TransitLab: fichier officiel local absent (HTTP '+localResponse.status+'); tentative sur la source IDFM');
+  const sourceResponse=await fetch('https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/traces-du-reseau-ferre-idf/exports/geojson',{cache:'no-store'});
+  if(!sourceResponse.ok)throw new Error('Source IDFM HTTP '+sourceResponse.status);
+  officialRail=await sourceResponse.json();
+ }
+ const officialFeatures=(officialRail?.features||[]).map(normalizeOfficialFeature).filter(Boolean);
+ const officialLineNames=new Set(officialFeatures.map(feature=>feature.properties.line));
+ if(officialFeatures.length>=500&&officialLineNames.size>=20&&officialLineNames.has('RER C')&&officialLineNames.has('TRAM 6')){
+  DATA.lines=officialFeatures;
+  console.info('TransitLab: tracés ferrés officiels IDFM chargés',officialFeatures.length,'tronçons',officialLineNames.size,'lignes');
+ } else throw new Error('Export incomplet: '+officialFeatures.length+' tronçons / '+officialLineNames.size+' lignes');
+} catch(error) { console.error('TransitLab: import officiel IDFM impossible; réseau embarqué conservé',error?.message||error); }
 DATA.lines=splitRepeatedRouteChains(DATA.lines);
 normalizeSharedTrackSegmentation(DATA.lines);
 const buildSharedTrackIndex=lines=>{if(!window.Worker)return Promise.resolve(null);return new Promise(resolve=>{let worker;try{worker=new Worker(new URL('assets/line-index-worker.js',document.baseURI),{type:'module'})}catch{resolve(null);return}const done=value=>{worker.terminate();resolve(value)};worker.onmessage=event=>done(event.data);worker.onerror=()=>done(null);worker.postMessage({type:'indexSharedTracks',lines})})};
@@ -240,7 +281,30 @@ function stationClusterKeyForPoint(lng,lat){return stationClusterKeyByCoord.get(
  const t=Math.max(0,Math.min(1,((p.x-pa.x)*dx+(p.y-pa.y)*dy)/length2));
  const aligned=map.unproject(L.point(pa.x+t*dx,pa.y+t*dy),zoom);
  return[aligned.lng,aligned.lat];
-}const customNetworkRecordCache=new WeakMap();
+}
+function alignedTransferHubCoord(clusterKey,fallback,zoom,anchorCoord){
+ const projected=[];
+ for(const name of lineNames){
+  if(!map.hasLayer(routeLayers[name]))continue;
+  const layer=stationLayersByLine[name];
+  if(!layer)continue;
+  layer.eachLayer(shape=>{
+   if(shape._transferClusterKey!==clusterKey||!shape._transferRawCoord)return;
+   // A station cluster can include nearby but physically distinct platforms
+   // (for example a tram stop across the road). Only combine markers that are
+   // genuinely co-located; otherwise the shared hub drifts off every route.
+   if(anchorCoord&&stationDistanceMeters(shape._transferRawCoord,anchorCoord)>25)return;
+   const coord=alignedStationCoord(name,shape._transferRawCoord,zoom);
+   const point=map.project([coord[1],coord[0]],zoom);
+   if(Number.isFinite(point.x)&&Number.isFinite(point.y))projected.push(point);
+  });
+ }
+ if(projected.length<2)return anchorCoord?alignedStationCoord(lineNames.find(name=>map.hasLayer(routeLayers[name])&&stationLayersByLine[name]?.getLayers?.().some(shape=>shape._transferClusterKey===clusterKey&&shape._transferRawCoord&&stationDistanceMeters(shape._transferRawCoord,anchorCoord)<=25))||'',anchorCoord,zoom):fallback.slice();
+ const mean=L.point(projected.reduce((sum,p)=>sum+p.x,0)/projected.length,projected.reduce((sum,p)=>sum+p.y,0)/projected.length);
+ const ll=map.unproject(mean,zoom);
+ return[ll.lng,ll.lat];
+}
+const customNetworkRecordCache=new WeakMap();
 function customNetworkRecord(stop){
  const lng=Number(stop?.lng),lat=Number(stop?.lat),nameKey=normalizeFrench(stop?.name||''),signature=[lng.toFixed(6),lat.toFixed(6),nameKey,String(stop?.stationKey||''),(stop?.stationLines||[]).join('|')].join('|'),cached=stop&&typeof stop==='object'?customNetworkRecordCache.get(stop):null;if(cached?.signature===signature)return cached.record;
  const save=record=>{if(stop&&typeof stop==='object')customNetworkRecordCache.set(stop,{signature,record});return record};if(!Number.isFinite(lng)||!Number.isFinite(lat))return save(null);
@@ -266,7 +330,7 @@ for(const mode of modeOrder){
  const list=document.createElement('div');list.className='line-list';
  for(const name of names){
   const layer=L.layerGroup();let strokes;const drawStrokes=()=>{if(strokes)layer.removeLayer(strokes);const zoom=map.getZoom(),features=zoom<12?(routeFeaturesByLine.get(name)||[]):(routeFeaturesByLine.get(name)||[]).map(f=>offsetRailFeature(f,name,zoom));strokes=L.geoJSON({type:'FeatureCollection',features},{style:()=>Object.assign({color:lineMeta[name].color},sharedLineStyle)});strokes.addTo(layer);if(stationsVisible&&stationDisplayMode()!=='logos')stationLayersByLine[name]?.eachLayer(shape=>shape.bringToFront?.())};drawStrokes();redrawRouteStrokes[name]=drawStrokes;
-   const stopFeatures=dedupeStationFeatures(stationFeaturesByLine.get(name)||[]);let stopLayer;const drawStops=()=>{if(stopLayer)layer.removeLayer(stopLayer);const detail=stationDisplayMode();if(detail==='logos'){stopLayer=stopLayer||L.layerGroup();stationLayersByLine[name]=stopLayer;return}const bounds=map.getBounds().pad(.08),visibleStopFeatures=stopFeatures.filter(feature=>{const c=feature.geometry?.coordinates||[];return bounds.contains([c[1],c[0]])&&(detail==='stations'||stationTransferKeys.has(stationClusterKeyForPoint(c[0],c[1])))});stopLayer=L.geoJSON({type:'FeatureCollection',features:visibleStopFeatures},{pointToLayer:(feature,latlng)=>{const planned=lineMeta[name].planned,clusterKey=stationClusterKeyForPoint(latlng.lng,latlng.lat),isTransfer=stationTransferKeys.has(clusterKey),showTransferPoint=document.getElementById('transferToggle')?.checked!==false,visibleTransferLines=visibleStationLineCount(clusterKey),useHub=isTransfer&&showTransferPoint&&visibleTransferLines>1,clusterCoord=stationClusterCoordsByKey.get(clusterKey),coord=useHub&&clusterCoord?clusterCoord:alignedStationCoord(name,[latlng.lng,latlng.lat],map.getZoom()),radius=useHub?0.1:stationPointRadius;const marker=L.circleMarker([coord[1],coord[0]],{pane:planned?'gpe-stations':undefined,radius,weight:stationPointWeight,color:'#fff',fillColor:lineMeta[name].color,fillOpacity:1,interactive:true});marker._transferLine=name;marker._transferClusterKey=clusterKey;marker._transferRawCoord=[latlng.lng,latlng.lat];marker._transferPlanned=planned;return marker},onEachFeature:(feature,shape)=>{shape.bindTooltip(feature.properties.name,{direction:'top',offset:[0,-2]});shape.bindPopup(`<strong>${feature.properties.name}</strong><br>${name}${feature.properties.provisional?'<br>Gare à titre conservatoire':''}`)}});if(stationsVisible&&stationDisplayMode()!=='logos')stopLayer.addTo(layer);stationLayersByLine[name]=stopLayer};drawStops();redrawRouteStrokes[name]=drawStrokes;redrawRouteStations[name]=drawStops;routeLayers[name]=layer;layer.addTo(map);
+   const stopFeatures=dedupeStationFeatures(stationFeaturesByLine.get(name)||[]);let stopLayer;const drawStops=()=>{if(stopLayer)layer.removeLayer(stopLayer);const detail=stationDisplayMode();if(detail==='logos'){stopLayer=stopLayer||L.layerGroup();stationLayersByLine[name]=stopLayer;return}const bounds=map.getBounds().pad(.08),visibleStopFeatures=stopFeatures.filter(feature=>{const c=feature.geometry?.coordinates||[];return bounds.contains([c[1],c[0]])&&(detail==='stations'||stationTransferKeys.has(stationClusterKeyForPoint(c[0],c[1])))});stopLayer=L.geoJSON({type:'FeatureCollection',features:visibleStopFeatures},{pointToLayer:(feature,latlng)=>{const planned=lineMeta[name].planned,clusterKey=stationClusterKeyForPoint(latlng.lng,latlng.lat),isTransfer=stationTransferKeys.has(clusterKey),showTransferPoint=document.getElementById('transferToggle')?.checked!==false,visibleTransferLines=visibleStationLineCount(clusterKey),useHub=isTransfer&&showTransferPoint&&visibleTransferLines>1,clusterCoord=stationClusterCoordsByKey.get(clusterKey),coord=useHub&&clusterCoord?alignedTransferHubCoord(clusterKey,clusterCoord,map.getZoom(),[latlng.lng,latlng.lat]):alignedStationCoord(name,[latlng.lng,latlng.lat],map.getZoom()),radius=useHub?0.1:stationPointRadius;const marker=L.circleMarker([coord[1],coord[0]],{pane:planned?'gpe-stations':undefined,radius,weight:stationPointWeight,color:'#fff',fillColor:lineMeta[name].color,fillOpacity:1,interactive:true});marker._transferLine=name;marker._transferClusterKey=clusterKey;marker._transferRawCoord=[latlng.lng,latlng.lat];marker._transferPlanned=planned;return marker},onEachFeature:(feature,shape)=>{shape.bindTooltip(feature.properties.name,{direction:'top',offset:[0,-2]});shape.bindPopup(`<strong>${feature.properties.name}</strong><br>${name}${feature.properties.provisional?'<br>Gare à titre conservatoire':''}`)}});if(stationsVisible&&stationDisplayMode()!=='logos')stopLayer.addTo(layer);stationLayersByLine[name]=stopLayer};drawStops();redrawRouteStrokes[name]=drawStrokes;redrawRouteStations[name]=drawStops;routeLayers[name]=layer;layer.addTo(map);
   const row=document.createElement('label');row.className='line-row';row.dataset.line=name.toLocaleLowerCase('fr');row.innerHTML=`<input type="checkbox" checked>${lineLogo(name)?'<img class="line-logo-mini" src="'+lineLogo(name)+'" alt="">':'<span class="swatch" style="--swatch-color:'+lineMeta[name].color+';background:'+lineMeta[name].color+'"></span>'}<span class="line-name"></span><span class="line-period"></span>`;row.querySelector('.line-name').textContent=name.replace(/^METRO /,'M').replace(/^TRAM /,'T');if(lineMeta[name].planned){row.querySelector('.line-period').textContent=lineMeta[name].period;row.title=lineMeta[name].periodDetail}
    const cb=row.querySelector('input');cb.setAttribute('aria-label',`Afficher ${name}`);cb.addEventListener('change',()=>{if(cb.checked){layer.addTo(map);if(stationsVisible)redrawRouteStations[name]?.()}else map.removeLayer(layer);selectAll.checked=names.every(n=>map.hasLayer(routeLayers[n]));refreshTransferStationPoints();updateLineBadges();updateTownLabels();updateStationNameLabels();renderTransferPointsOnly();});list.appendChild(row);
  }
@@ -379,7 +443,7 @@ function renderTransfers(){renderTransferPointsOnly()}function updateStationName
     L.marker(labelLatLng,{interactive:false,icon:L.divIcon({className:'station-name-label',html,iconSize:[station.width,20],iconAnchor:[station.width/2,16]})}).addTo(stationNameLayer);
   }
 }
-document.getElementById('lineBadgesToggle').addEventListener('change',()=>{updateLineBadges();updateTownLabels();renderCustom()});document.getElementById('stationNamesToggle').addEventListener('change',()=>{updateStationNameLabels();renderCustom()});function redrawVisibleRoutes(){for(const name of lineNames){if(map.hasLayer(routeLayers[name]))redrawRouteStrokes[name]?.()}}function redrawVisibleRouteStations(){if(!stationsVisible)return;for(const name of lineNames){if(map.hasLayer(routeLayers[name]))redrawRouteStations[name]?.()}}document.getElementById('stationNamesMode').addEventListener('change',()=>{redrawVisibleRouteStations();updateLineBadges();renderCustom()});function refreshTransferStationPoints(){const showTransferPoint=document.getElementById('transferToggle')?.checked!==false;for(const name of lineNames){const layer=stationLayersByLine[name];if(!layer)continue;layer.eachLayer(shape=>{const raw=shape._transferRawCoord;if(!raw)return;const clusterKey=shape._transferClusterKey,isTransfer=stationTransferKeys.has(clusterKey),visibleTransferLines=visibleStationLineCount(clusterKey),useHub=isTransfer&&showTransferPoint&&visibleTransferLines>1,clusterCoord=stationClusterCoordsByKey.get(clusterKey),coord=useHub&&clusterCoord?clusterCoord:alignedStationCoord(name,raw,map.getZoom());shape.setLatLng([coord[1],coord[0]]);shape.setRadius(useHub?.1:stationPointRadius)})}refreshCustomTransferStationPoints()}function refreshCustomTransferStationPoints(){const showTransferPoint=document.getElementById('transferToggle')?.checked!==false;for(const marker of customMarkers||[]){const state=marker._customTransferState;if(!state)continue;const visible=visibleStationLineCount(state.clusterKey);marker.setRadius(state.isTransfer&&((showTransferPoint&&visible>1)||(state.isNetwork&&visible>0))?.1:stationPointRadius)}}document.getElementById('transferToggle').addEventListener('change',()=>{refreshTransferStationPoints();renderTransferPointsOnly();updateStationNameLabels()});let overlayRefreshTimer=0,routeRedrawPending=false,routeGeometryZoom=map.getZoom();function scheduleOverlayRefresh(){clearTimeout(overlayRefreshTimer);overlayRefreshTimer=setTimeout(()=>{overlayRefreshTimer=0;if(routeRedrawPending){const zoom=map.getZoom();if(zoom>=12||routeGeometryZoom>=12)redrawVisibleRoutes();routeGeometryZoom=zoom;routeRedrawPending=false}redrawVisibleRouteStations();updateLineBadges();renderCustom();updateTownLabels()},100)}map.on('zoomend',()=>{routeRedrawPending=true;scheduleOverlayRefresh()});map.on('moveend',scheduleOverlayRefresh);setTimeout(()=>{updateLineBadges();updateStationNameLabels();updateTownLabels();renderTransferPointsOnly()},80);
+document.getElementById('lineBadgesToggle').addEventListener('change',()=>{updateLineBadges();updateTownLabels();renderCustom()});document.getElementById('stationNamesToggle').addEventListener('change',()=>{updateStationNameLabels();renderCustom()});function redrawVisibleRoutes(){for(const name of lineNames){if(map.hasLayer(routeLayers[name]))redrawRouteStrokes[name]?.()}}function redrawVisibleRouteStations(){if(!stationsVisible)return;for(const name of lineNames){if(map.hasLayer(routeLayers[name]))redrawRouteStations[name]?.()}}document.getElementById('stationNamesMode').addEventListener('change',()=>{redrawVisibleRouteStations();updateLineBadges();renderCustom()});function refreshTransferStationPoints(){const showTransferPoint=document.getElementById('transferToggle')?.checked!==false;for(const name of lineNames){const layer=stationLayersByLine[name];if(!layer)continue;layer.eachLayer(shape=>{const raw=shape._transferRawCoord;if(!raw)return;const clusterKey=shape._transferClusterKey,isTransfer=stationTransferKeys.has(clusterKey),visibleTransferLines=visibleStationLineCount(clusterKey),useHub=isTransfer&&showTransferPoint&&visibleTransferLines>1,clusterCoord=stationClusterCoordsByKey.get(clusterKey),coord=useHub&&clusterCoord?alignedTransferHubCoord(clusterKey,clusterCoord,map.getZoom(),raw):alignedStationCoord(name,raw,map.getZoom());shape.setLatLng([coord[1],coord[0]]);shape.setRadius(useHub?.1:stationPointRadius)})}refreshCustomTransferStationPoints()}function refreshCustomTransferStationPoints(){const showTransferPoint=document.getElementById('transferToggle')?.checked!==false;for(const marker of customMarkers||[]){const state=marker._customTransferState;if(!state)continue;const visible=visibleStationLineCount(state.clusterKey);marker.setRadius(state.isTransfer&&((showTransferPoint&&visible>1)||(state.isNetwork&&visible>0))?.1:stationPointRadius)}}document.getElementById('transferToggle').addEventListener('change',()=>{refreshTransferStationPoints();renderTransferPointsOnly();updateStationNameLabels()});let overlayRefreshTimer=0,routeRedrawPending=false,routeGeometryZoom=map.getZoom();function scheduleOverlayRefresh(){clearTimeout(overlayRefreshTimer);overlayRefreshTimer=setTimeout(()=>{overlayRefreshTimer=0;if(routeRedrawPending){const zoom=map.getZoom();if(zoom>=12||routeGeometryZoom>=12)redrawVisibleRoutes();routeGeometryZoom=zoom;routeRedrawPending=false}redrawVisibleRouteStations();updateLineBadges();renderCustom();updateTownLabels()},100)}map.on('zoomend',()=>{routeRedrawPending=true;scheduleOverlayRefresh()});map.on('moveend',scheduleOverlayRefresh);setTimeout(()=>{updateLineBadges();updateStationNameLabels();updateTownLabels();renderTransferPointsOnly()},80);
 
 const datalist=document.getElementById('stationNames');for(const f of uniqueStations){const option=document.createElement('option');option.value=f.properties.name;datalist.appendChild(option)}for(const place of DATA.pois||[]){const option=document.createElement('option');datalist.appendChild(option);option.value=place.name}for(const place of DATA.educationPlaces||[]){const option=document.createElement('option');datalist.appendChild(option);option.value=place.name}
 const networkStationDatalist=document.getElementById('networkStationNames');for(const station of connectableStations){const option=document.createElement('option');option.value=station.label;networkStationDatalist.appendChild(option)}

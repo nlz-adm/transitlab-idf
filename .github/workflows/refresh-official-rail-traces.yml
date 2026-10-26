@@ -1,0 +1,63 @@
+name: Refresh official rail traces
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+  push:
+    paths:
+      - "tools/refresh_official_rail_traces.py"
+      - ".github/workflows/refresh-official-rail-traces.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Download official Île-de-France Mobilités rail traces
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --location --retry 5 --retry-all-errors \
+            --connect-timeout 30 --max-time 180 \
+            "https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/traces-du-reseau-ferre-idf/exports/geojson" \
+            --output /tmp/rail-source.geojson
+          echo "Downloaded source size: $(wc -c < /tmp/rail-source.geojson) bytes"
+          python - <<'PY'
+          import gzip
+          from pathlib import Path
+          source=Path('/tmp/rail-source.geojson').read_bytes()
+          decoded=gzip.decompress(source) if source.startswith(b'\x1f\x8b') else source
+          Path('/tmp/rail-source-decoded.geojson').write_bytes(decoded)
+          print(f"Decoded official export: {len(decoded)} bytes; gzip={source.startswith(b'\x1f\x8b')}")
+          PY
+          python -m json.tool /tmp/rail-source-decoded.geojson >/dev/null
+          python - <<'PY'
+          import json
+          with open("/tmp/rail-source-decoded.geojson", encoding="utf-8") as f:
+              data = json.load(f)
+          features = data.get("features", [])
+          print(f"Source payload: {len(features)} features; type={data.get('type')}")
+          if data.get("type") != "FeatureCollection" or len(features) < 500:
+              raise SystemExit("Official export is not a complete-looking GeoJSON FeatureCollection")
+          PY
+      - name: Normalize and validate source
+        run: python tools/refresh_official_rail_traces.py /tmp/rail-source-decoded.geojson assets/official-rail-traces.json
+      - name: Commit updated official geometry
+        run: |
+          set -euo pipefail
+          if git ls-files --error-unmatch assets/official-rail-traces.json >/dev/null 2>&1 && git diff --quiet -- assets/official-rail-traces.json; then
+            echo "Official geometry unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/official-rail-traces.json
+          git commit -m "Refresh official IDFM rail geometry"
+          git push
