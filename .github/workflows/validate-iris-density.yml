@@ -58,7 +58,8 @@ jobs:
         run: |
           set -euo pipefail
           curl --fail --show-error --location --retry 5 --retry-all-errors --connect-timeout 30 --max-time 180 "https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets/traces-du-reseau-ferre-idf/exports/geojson" --output /tmp/rail-source.geojson
-          python tools/refresh_official_rail_traces.py /tmp/rail-source.geojson assets/official-rail-traces.json
+          gzip -dc /tmp/rail-source.geojson > /tmp/rail-source-decoded.geojson
+          python tools/refresh_official_rail_traces.py /tmp/rail-source-decoded.geojson assets/official-rail-traces.json
           python - <<'PY'
           import json
           from pathlib import Path
