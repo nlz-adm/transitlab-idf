@@ -9,7 +9,18 @@ try {
   url.searchParams.set('test', '1');
   const response = await page.goto(url.toString(), { waitUntil: 'domcontentloaded', timeout: 30000 });
   if (!response?.ok()) throw new Error('TransitLab did not return HTTP success.');
-  await page.waitForFunction(() => !!window.__transitLabMap && !!document.querySelector('#customModePicker'), null, { timeout: 45000 });
+  try {
+    await page.waitForFunction(() => !!window.__transitLabMap && !!document.querySelector('#customModePicker'), null, { timeout: 45000 });
+  } catch (error) {
+    const diagnostics = await page.evaluate(() => ({
+      title: document.title,
+      mapText: document.getElementById('map')?.textContent?.slice(0, 500),
+      pickerPresent: !!document.querySelector('#customModePicker'),
+      appScripts: [...document.scripts].map(script => script.src).filter(Boolean),
+      mapContainerPresent: !!document.getElementById('map'),
+    })).catch(() => ({}));
+    throw new Error('Map initialization timed out. Browser errors: ' + failures.join(' | ') + '. Diagnostics: ' + JSON.stringify(diagnostics) + '. Original: ' + error.message);
+  }
   const loadedLayerCount = await page.locator('#layerGroups .line-row').count();
   if (loadedLayerCount < 1) throw new Error('Map initialized but no route entries were rendered in the layer list.');
   await page.waitForFunction(() => [...document.querySelectorAll('#customModePicker img')].length === 4 && [...document.querySelectorAll('#customModePicker img')].every(img => img.complete && img.naturalWidth > 0), null, { timeout: 15000 });
