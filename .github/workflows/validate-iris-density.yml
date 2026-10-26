@@ -16,6 +16,7 @@ on:
       - "tools/test-iris-map-logic.cjs"
       - "tools/test-route-topology.cjs"
       - "tools/audit-route-overlaps.cjs"
+      - "tools/test-route-overlap-audit.cjs"
       - "assets/network-data.json"
       - "tools/test-iris-browser.mjs"
       - ".github/workflows/validate-iris-density.yml"
@@ -58,6 +59,8 @@ jobs:
         run: node tools/test-iris-map-logic.cjs
       - name: Test route junction topology
         run: node tools/test-route-topology.cjs
+      - name: Test route overlap audit against synthetic geometries
+        run: node tools/test-route-overlap-audit.cjs
       - name: Audit potentially overlapping route geometries
         run: node tools/audit-route-overlaps.cjs
       - name: Check JSON data catalog and IRIS index
