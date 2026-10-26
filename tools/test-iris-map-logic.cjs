@@ -42,7 +42,7 @@ const populationFill = loadFunction('populationFill');
 const cases = [
   [0, '#fff7bc'],
   [500, '#fee391'],
-  [1000, '#fed270'],
+  [1000, '#fed470'],
   [1500, '#fec44f'],
   [2250, '#feaf3c'],
   [3000, '#fe9929'],
