@@ -167,8 +167,53 @@ try {
     }
     console.log(JSON.stringify({ result: 'PASS', zoom, stationAlignment: zoomAlignment }));
   }
+  const badgeCentering = [];
+  for (const station of [
+    { name: 'Jussieu', center: [48.8466, 2.3522] },
+    { name: 'Duroc', center: [48.8466, 2.3161] },
+    { name: 'République', center: [48.8675, 2.3636] },
+    { name: 'Bastille', center: [48.8532, 2.3692] },
+    { name: 'Châtelet', center: [48.8584, 2.3470] },
+    { name: 'Gare de Lyon', center: [48.8443, 2.3730] },
+  ]) {
+    await page.evaluate(async ({ center }) => {
+      const map = window.__transitLabMap;
+      for (const selector of ['#stationsToggle', '#stationNamesToggle', '#transferToggle']) {
+        const input = document.querySelector(selector);
+        if (input && !input.checked) { input.checked = true; input.dispatchEvent(new Event('change', { bubbles: true })); }
+      }
+      const mode = document.querySelector('#stationNamesMode');
+      mode.value = 'all'; mode.dispatchEvent(new Event('change', { bubbles: true }));
+      map.setView(center, 17, { animate: false });
+      await new Promise(resolve => setTimeout(resolve, 600));
+    }, station);
+    const result = await page.evaluate(name => {
+      const map = window.__transitLabMap, mapRect = document.getElementById('map').getBoundingClientRect();
+      const label = [...document.querySelectorAll('.station-name-label')].find(el => el.textContent.toLocaleLowerCase('fr').startsWith(name.toLocaleLowerCase('fr')));
+      if (!label) return { name, error: 'station label not rendered' };
+      const badges = [...label.querySelectorAll('.route-badge')];
+      if (!badges.length) return { name, error: 'transfer badges not rendered' };
+      const badgeRects = badges.map(el => el.getBoundingClientRect());
+      const badgeCenterX = (Math.min(...badgeRects.map(rect => rect.left)) + Math.max(...badgeRects.map(rect => rect.right))) / 2 - mapRect.left;
+      const layers = [], seen = new Set();
+      const walk = layer => { if (!layer || seen.has(layer)) return; seen.add(layer); layers.push(layer); if (typeof layer.eachLayer === 'function') layer.eachLayer(walk); };
+      map.eachLayer(walk);
+      const hub = layers.find(layer => typeof layer.getRadius === 'function' && layer.getRadius() >= 5 && layer.getPopup?.()?.getContent?.().toLocaleLowerCase('fr').includes(name.toLocaleLowerCase('fr')));
+      if (!hub) return { name, error: 'transfer hub circle not rendered' };
+      const hubCenter = map.latLngToContainerPoint(hub.getLatLng());
+      return {
+        name, badgeCount: badges.length,
+        horizontalErrorPx: Math.round(Math.abs(badgeCenterX - hubCenter.x) * 10) / 10,
+        verticalErrorPx: Math.round(Math.abs((badgeRects.reduce((sum, rect) => sum + rect.top + rect.height / 2, 0) / badgeRects.length - mapRect.top) - hubCenter.y) * 10) / 10,
+      };
+    }, station.name);
+    if (result.error || result.horizontalErrorPx > 1 || result.verticalErrorPx > 3) {
+      throw new Error('Transfer badge centering failed at zoom 17: ' + JSON.stringify(result));
+    }
+    badgeCentering.push(result);
+  }
   if (failures.length) throw new Error('Browser JavaScript errors: ' + failures.join(' | '));
-  console.log(JSON.stringify({ result: 'PASS', modeIcons: expected.map(x=>x[0]), stationAlignmentAtZoom14: alignment }, null, 2));
+  console.log(JSON.stringify({ result: 'PASS', modeIcons: expected.map(x=>x[0]), stationAlignmentAtZoom14: alignment, badgeCenteringAtZoom17: badgeCentering }, null, 2));
 } finally {
   await browser.close();
 }
