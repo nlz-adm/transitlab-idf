@@ -1,106 +1,104 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="TransitLab IDF : carte interactive des transports en commun d'Île-de-France, données de population, création de lignes hypothétiques.">
-<meta name="theme-color" content="#1f2933">
-<title>TransitLab IDF · Carte interactive des transports en Île-de-France</title>
-<link rel="icon" type="image/png" href="assets/transitlab-favicon-32.png">
-<link rel="apple-touch-icon" href="assets/transitlab-favicon-180.png">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Explorez le réseau de transports francilien et imaginez vos propres lignes.">
+<meta name="theme-color" content="#0b1220">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="TransitLab Île-de-France">
+<meta property="og:title" content="TransitLab Île-de-France · Imaginez le réseau">
+<meta property="og:description" content="Explorez le réseau de transports francilien et imaginez vos propres lignes.">
+<meta property="og:image" content="https://nlz-adm.github.io/transitlab-idf/assets/transitlab-logo.png">
+<meta property="og:locale" content="fr_FR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="TransitLab Île-de-France · Imaginez le réseau">
+<meta name="twitter:description" content="Explorez le réseau de transports francilien et imaginez vos propres lignes.">
+<meta name="twitter:image" content="https://nlz-adm.github.io/transitlab-idf/assets/transitlab-logo.png">
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/transitlab-favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="assets/transitlab-favicon-48.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/transitlab-favicon-180.png">
+<title>TransitLab Île-de-France · Imaginez le réseau</title>
 <style>
-:root{--bg:#f4f6f8;--fg:#1f2933;--accent:#314f88;--accent-fg:#fff;--border:#c5cdd7;--card:#fff;--radius:14px}
-body.dark-mode{--bg:#0b1220;--fg:#dbe7f4;--accent:#5a8fd4;--accent-fg:#0b1220;--border:#3b4a60;--card:#152238}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--fg);line-height:1.5}
-.container{max-width:1200px;margin:0 auto;padding:24px}
-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;margin-bottom:32px}
-.logo{display:flex;align-items:center;gap:12px}
-.logo img{width:48px;height:48px}
-.logo h1{font-size:24px;font-weight:700}
-.theme-toggle{display:flex;align-items:center;gap:8px}
-.theme-toggle label{font-size:14px}
-.theme-toggle input{width:18px;height:18px}
-.hero{background:var(--card);border-radius:var(--radius);padding:32px;margin-bottom:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
-.hero h2{font-size:28px;font-weight:700;margin-bottom:16px}
-.hero p{font-size:16px;max-width:640px;margin-bottom:24px}
-.hero-actions{display:flex;gap:12px;flex-wrap:wrap}
-.button{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:8px;font-size:15px;font-weight:600;text-decoration:none;transition:all .2s;cursor:pointer;border:none}
-.button.primary{background:var(--accent);color:var(--accent-fg)}
-.button.primary:hover{opacity:.9}
-.button.secondary{background:transparent;color:var(--accent);border:2px solid var(--accent)}
-.button.secondary:hover{background:var(--accent);color:var(--accent-fg)}
-.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-bottom:32px}
-.feature-card{background:var(--card);border-radius:var(--radius);padding:24px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
-.feature-card h3{font-size:18px;font-weight:700;margin-bottom:12px}
-.feature-card p{font-size:14px}
-.map-section{background:var(--card);border-radius:var(--radius);padding:24px;margin-bottom:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
-.map-section h2{font-size:24px;font-weight:700;margin-bottom:16px}
-.map-embed{width:100%;height:600px;border:none;border-radius:8px}
-footer{text-align:center;padding:24px;font-size:14px;color:var(--border)}
-@media(max-width:768px){.hero h2{font-size:22px}.map-embed{height:400px}}
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#eaf0f8;background:#0b1220;font-synthesis:none;text-rendering:optimizeLegibility}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:#0b1220;color:#eaf0f8}
+a{color:inherit}
+.site{min-height:100vh;overflow:hidden}
+.nav{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:18px;padding:14px clamp(18px,4vw,56px);background:#0b1220e8;border-bottom:1px solid #263449;backdrop-filter:blur(14px)}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:800;letter-spacing:-.3px}
+.brand-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#f000d9;color:#fff;font-size:11px;box-shadow:0 5px 20px #f000d944}
+.nav-links{display:flex;align-items:center;gap:20px;margin-left:auto;color:#aab8cb;font-size:12px}
+.nav-links a{text-decoration:none}.nav-links a:hover{color:#fff}
+.nav-cta{padding:9px 13px;border:1px solid #506c9f;border-radius:8px;background:#284575;color:#fff;font-weight:700}
+.hero{position:relative;padding:clamp(58px,10vw,115px) clamp(18px,8vw,120px) clamp(50px,8vw,96px);background:radial-gradient(circle at 75% 20%,#203e69 0,#121e33 30%,#0b1220 72%)}
+.hero:after{content:"";position:absolute;right:-10%;top:18%;width:56%;height:2px;background:linear-gradient(90deg,transparent,#f000d9,transparent);transform:rotate(-13deg);opacity:.75;box-shadow:0 0 26px #f000d988}
+.hero-inner{position:relative;z-index:1;max-width:720px}
+.eyebrow{margin:0 0 15px;color:#8da8d1;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase}
+h1{max-width:740px;margin:0;color:#fff;font-size:clamp(38px,6vw,72px);line-height:1.02;letter-spacing:-2.8px}
+.hero p{max-width:590px;margin:22px 0 0;color:#b9c7d9;font-size:17px;line-height:1.6}
+.hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px}
+.button{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 16px;border-radius:9px;border:1px solid #405574;background:#16243a;color:#dfe9f5;text-decoration:none;font-size:12px;font-weight:750;cursor:pointer}
+.button:hover{background:#203552;border-color:#5d7eaf}.button.primary{border-color:#f000d9;background:#f000d9;color:#fff;box-shadow:0 8px 24px #f000d933}.button.primary:hover{background:#ff28e6}
+.section{padding:clamp(48px,7vw,82px) clamp(18px,6vw,90px)}
+.section-light{background:#f3f6fa;color:#203047}
+.section-head{display:flex;align-items:end;justify-content:space-between;gap:20px;max-width:1180px;margin:0 auto 25px}
+.section h2{margin:0;font-size:clamp(25px,3vw,38px);letter-spacing:-1.2px}.section-intro{max-width:560px;margin:10px auto 0;line-height:1.55;color:#75869d;font-size:14px}
+.section-dark .section-intro{color:#a8b8cb}.section-head .section-intro{margin:0;text-align:right}
+.features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;max-width:1180px;margin:0 auto}
+.card{padding:20px;border:1px solid #dfe6ef;border-radius:14px;background:#fff;box-shadow:0 10px 30px #1c365712}.card-icon{display:grid;place-items:center;width:34px;height:34px;margin-bottom:14px;border-radius:9px;background:#edf1fb;color:#31568f;font-weight:850}.card h3{margin:0 0 7px;font-size:14px}.card p{margin:0;color:#718197;font-size:12px;line-height:1.55}
+.map-section{padding-top:55px;background:#111b2b}.map-shell{max-width:1240px;margin:0 auto;border:1px solid #2d405d;border-radius:16px;background:#0b1220;box-shadow:0 24px 70px #0007;overflow:hidden}.map-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;border-bottom:1px solid #263449;color:#b5c3d5;font-size:12px}.map-toolbar strong{color:#fff}.map-toolbar-actions{display:flex;gap:7px}.map-toolbar .button{min-height:32px;padding:6px 10px;font-size:11px}.map-frame{display:block;width:100%;height:min(78vh,820px);min-height:560px;border:0;background:#f4f6f8}
+.site-note{max-width:1240px;margin:14px auto 0;color:#8294ab;font-size:11px;line-height:1.5}
+.site-note a{color:#aec4e8;text-decoration:none}.site-note a:hover{text-decoration:underline}
+.footer{display:flex;justify-content:space-between;gap:20px;padding:22px clamp(18px,6vw,90px);border-top:1px solid #263449;background:#0b1220;color:#7f91a8;font-size:11px}.footer strong{color:#cbd8e8}
+@media(max-width:760px){.nav{gap:10px;padding:11px 14px}.brand{font-size:13px}.nav-links{gap:9px;font-size:10px}.nav-links a:not(.nav-cta){display:none}.hero p{font-size:15px}.features{grid-template-columns:1fr}.section-head{display:block}.section-head .section-intro{text-align:left;margin-top:10px}.map-toolbar{align-items:flex-start;flex-direction:column}.map-toolbar-actions{width:100%}.map-toolbar .button{flex:1}.map-frame{height:74vh;min-height:500px}.footer{display:block}.footer span{display:block;margin-top:7px}}
 </style>
 </head>
 <body>
-<div class="container">
-<header>
-<div class="logo">
-<img src="assets/transitlab-logo.png" alt="TransitLab IDF">
-<h1>TransitLab IDF</h1>
+<div class="site">
+  <header class="nav">
+    <a class="brand" href="#accueil" aria-label="TransitLab Île-de-France">
+      <span class="brand-mark">TL</span><span>TransitLab Île-de-France</span>
+    </a>
+    <nav class="nav-links" aria-label="Navigation principale">
+      <a href="#fonctionnalites">Fonctionnalités</a>
+      <a href="#carte">La carte</a>
+      <a class="nav-cta" href="#carte">Explorer</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" id="accueil">
+      <div class="hero-inner">
+        <p class="eyebrow">Cartographie · prospective · Île-de-France</p>
+        <h1>Imaginez les transports de demain.</h1>
+        <p>Explorez le réseau francilien, ajoutez vos propres lignes et visualisez leurs stations, leurs correspondances et leur territoire.</p>
+        <div class="hero-actions"><a class="button primary" href="#carte">Ouvrir la carte</a><a class="button" href="#fonctionnalites">Découvrir l’outil</a></div>
+      </div>
+    </section>
+
+    <section class="section section-light" id="fonctionnalites">
+      <div class="section-head"><div><h2>Un atelier pour penser le réseau</h2><p class="section-intro">Une interface simple pour tester une idée de ligne et comprendre immédiatement ce qu’elle relie.</p></div></div>
+      <div class="features">
+        <article class="card"><div class="card-icon">↗</div><h3>Tracez vos lignes</h3><p>Posez les stations sur la carte, raccordez-les au réseau existant et donnez une identité à chaque projet.</p></article>
+        <article class="card"><div class="card-icon">↔</div><h3>Repérez les correspondances</h3><p>Les stations, les logos des lignes et les points de transfert rendent les connexions faciles à lire.</p></article>
+        <article class="card"><div class="card-icon">↓</div><h3>Exportez vos idées</h3><p>Prévisualisez un tracé ou un plan schématique, puis téléchargez vos résultats pour les partager.</p></article>
+      </div>
+    </section>
+
+    <section class="section map-section" id="carte">
+      <div class="section-head"><div><h2>La carte interactive</h2><p class="section-intro">La carte actuelle reste le cœur de l’outil. Elle est intégrée ici dans une présentation de site, sans modifier le fichier original.</p></div></div>
+      <div class="map-shell">
+        <div class="map-toolbar"><span><strong>Explorateur du réseau</strong> · lignes existantes et projets personnalisés</span><div class="map-toolbar-actions"><a class="button" href="carte-interactive-ile-de-france.html?v=idf-custom-transport-20261026" target="_blank" rel="noopener">Ouvrir seul ↗</a><a class="button primary" href="carte-interactive-ile-de-france.html?v=idf-custom-transport-20261026#map">Commencer</a></div></div>
+        <iframe class="map-frame" src="carte-interactive-ile-de-france.html?v=idf-custom-transport-20261026" title="Carte interactive des transports en Île-de-France" loading="lazy" decoding="async"></iframe>
+      </div>
+      <p class="site-note">La carte fonctionne localement et peut ensuite être publiée avec ce fichier et <a href="carte-interactive-ile-de-france.html?v=idf-custom-transport-20261026">la carte interactive</a> dans le même dossier.</p>
+    </section>
+  </main>
+
+  <footer class="footer"><strong>TransitLab Île-de-France</strong><span>Outil de visualisation et de prospective · projet indépendant</span></footer>
 </div>
-<div class="theme-toggle">
-<label for="darkMode">Mode sombre</label>
-<input type="checkbox" id="darkMode">
-</div>
-</header>
-<section class="hero">
-<h2>Carte interactive des transports en Île-de-France</h2>
-<p>Explorez le réseau de transports en commun francilien, visualisez les données de population par quartier IRIS, et créez vos propres lignes hypothétiques.</p>
-<div class="hero-actions">
-<a href="carte-interactive-ile-de-france.html?v=20261028-full-restore-v1" class="button primary">Ouvrir la carte →</a>
-<a href="#features" class="button secondary">En savoir plus</a>
-</div>
-</section>
-<section id="features" class="features">
-<div class="feature-card">
-<h3>🗺️ Carte interactive</h3>
-<p>Visualisez toutes les lignes de métro, RER, tramway et Transilien avec des données officielles d'Île-de-France Mobilités.</p>
-</div>
-<div class="feature-card">
-<h3>👥 Densité de population</h3>
-<p>Affichez la densité par quartier IRIS avec un dégradé continu, et visualisez les noms des quartiers au zoom élevé.</p>
-</div>
-<div class="feature-card">
-<h3>✏️ Lignes hypothétiques</h3>
-<p>Créez vos propres lignes de transport, ajoutez des arrêts, et générez des plans schématiques ou cartographiques.</p>
-</div>
-<div class="feature-card">
-<h3>🔄 Correspondances</h3>
-<p>Les stations de correspondance sont correctement alignées avec les tracés décalés des lignes partagées.</p>
-</div>
-<div class="feature-card">
-<h3>💾 Sauvegarde locale</h3>
-<p>Vos lignes hypothétiques sont sauvegardées dans votre navigateur. Exportez-les en GeoJSON ou importez-en d'autres.</p>
-</div>
-<div class="feature-card">
-<h3>📱 Responsive</h3>
-<p>Interface adaptée à tous les écrans, du smartphone au grand moniteur. Mode sombre disponible.</p>
-</div>
-</section>
-<section class="map-section">
-<h2>Accès direct à la carte</h2>
-<iframe src="carte-interactive-ile-de-france.html?v=20261028-full-restore-v1" class="map-embed" title="Carte interactive des transports en Île-de-France"></iframe>
-</section>
-<footer>
-<p>TransitLab IDF · Données : Île-de-France Mobilités, IGN, INSEE · Cartographie : Leaflet, CARTO</p>
-</footer>
-</div>
-<script>
-const darkModeCheckbox=document.getElementById('darkMode');
-function applyTheme(dark){document.body.classList.toggle('dark-mode',dark);try{localStorage.setItem('transitlab-dark',dark?'1':'0')}catch{}}
-darkModeCheckbox.addEventListener('change',()=>applyTheme(darkModeCheckbox.checked));
-const stored=localStorage.getItem('transitlab-dark');if(stored==='1'){darkModeCheckbox.checked=true;applyTheme(true)}
-</script>
 </body>
 </html>
