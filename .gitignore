@@ -19,3 +19,8 @@ pnpm-lock.yaml
 
 # Build
 dist/
+
+# Captures et artefacts de travail
+screenshots/
+tools/*.tmp.*
+tools/*.diff

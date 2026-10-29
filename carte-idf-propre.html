@@ -37,8 +37,11 @@
   var linesLayer = L.layerGroup().addTo(map);
   var stationsLayer = L.layerGroup().addTo(map);
   var deptLayer = L.layerGroup().addTo(map);
-  var fondIGN = L.imageOverlay('assets/ign-idf-fast.webp', [[47.95, 1.3], [49.4, 3.75]], { opacity: 1, interactive: false });
-  L.control.layers({}, { 'Fond IGN détaillé': fondIGN }, { position: 'topleft', collapsed: true }).addTo(map);
+  var fondOYMAP = L.tileLayer('https://t{s}-ratp-prod3.onyourmap.com/oym3/map/tile/ratp/{z}/{x}/{y}?appKey=RATP3AAGRAGRGN022445245O1&Referer=http://www.ratp.fr', {
+    subdomains: '1234', minZoom: 8, maxZoom: 19, crossOrigin: true,
+    attribution: '© onyourmap © TomTom 2026'
+  }).addTo(map);
+  L.control.layers({}, { 'Fond onyourmap © TomTom 2026': fondOYMAP }, { position: 'topleft', collapsed: true }).addTo(map);
 
   var byLine = {};   // line name -> { color, layer }
   var listEl = document.getElementById('lines');

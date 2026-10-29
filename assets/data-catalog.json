@@ -19,8 +19,10 @@
       "loading": "on-demand"
     },
     "basemap": {
-      "url": "assets/ign-idf-fast.webp",
-      "loading": "on-demand"
+      "url": "https://t{s}-ratp-prod3.onyourmap.com/oym3/map/tile/ratp/{z}/{x}/{y}",
+      "provider": "onyourmap · TomTom 2026",
+      "attribution": "© onyourmap © TomTom 2026",
+      "loading": "tiles online; aperçu du tracé assemblé à la demande"
     },
     "populationIris": {
       "url": "assets/population-iris-index.json",
